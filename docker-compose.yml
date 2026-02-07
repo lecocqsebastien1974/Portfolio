@@ -1,0 +1,89 @@
+# Docker Compose pour Portfolio
+# TOTALEMENT ISOLÉ d'investment_game
+# - Noms de containers avec préfixe "portfolio_"
+# - Réseau Docker dédié "portfolio_network"
+# - Volumes avec préfixe "portfolio_"
+# - Ports différents: 3001 (frontend), 8001 (backend), 5433 (postgres)
+
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL pour Portfolio
+  portfolio_db:
+    image: postgres:15-alpine
+    container_name: portfolio_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portfolio_db}
+      POSTGRES_USER: ${POSTGRES_USER:-portfolio_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portfolio_password}
+    volumes:
+      - portfolio_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Port externe 5433 pour éviter conflit avec investment_game
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-portfolio_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Django pour Portfolio
+  portfolio_backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: portfolio_backend
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8001"
+    volumes:
+      - ./backend:/app
+      - portfolio_static_volume:/app/staticfiles
+      - portfolio_media_volume:/app/media
+    ports:
+      - "8001:8001"  # Port 8001 pour éviter conflit avec investment_game (8000)
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-portfolio-dev-key-change-in-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-portfolio_user}:${POSTGRES_PASSWORD:-portfolio_password}@portfolio_db:5432/${POSTGRES_DB:-portfolio_db}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,portfolio_backend}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
+    depends_on:
+      portfolio_db:
+        condition: service_healthy
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+
+  # Frontend React pour Portfolio
+  portfolio_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: portfolio_frontend
+    ports:
+      - "3001:3001"  # Port 3001 pour éviter conflit avec investment_game (3000)
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8001}
+    depends_on:
+      - portfolio_backend
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+
+# Réseau dédié à Portfolio - totalement isolé des autres projets
+networks:
+  portfolio_network:
+    name: portfolio_network
+    driver: bridge
+
+# Volumes dédiés à Portfolio - aucun partage avec investment_game
+volumes:
+  portfolio_postgres_data:
+    name: portfolio_postgres_data
+  portfolio_static_volume:
+    name: portfolio_static_volume
+  portfolio_media_volume:
+    name: portfolio_media_volume

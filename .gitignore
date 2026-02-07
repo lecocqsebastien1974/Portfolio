@@ -48,6 +48,14 @@ Thumbs.db
 # Coverage
 htmlcov/
 .coverage
+
+# Docker
+.env
+docker-compose.override.yml
+
+# Portfolio specific
+backend/staticfiles/
+backend/media/
 .coverage.*
 coverage/
 *.cover

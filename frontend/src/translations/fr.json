@@ -1,0 +1,73 @@
+{
+  "common": {
+    "back": "← Retour",
+    "import": "Importer",
+    "importing": "Import en cours...",
+    "chooseFile": "Choisir un fichier",
+    "administration": "Administration",
+    "welcome": "Bienvenue dans votre application Portfolio"
+  },
+  "home": {
+    "title": "Portfolio",
+    "adminButton": "🔧 Administration"
+  },
+  "admin": {
+    "title": "Administration",
+    "subtitle": "Panneau d'administration du Portfolio",
+    "importData": "📥 Import des données",
+    "viewData": "Visualisation des données",
+    "manageProjects": "Gérer les projets",
+    "manageUsers": "Gérer les utilisateurs"
+  },
+  "import": {
+    "title": "📥 Import des données",
+    "subtitle": "Importez vos fichiers de données",
+    "tabs": {
+      "signaletique": "Signalétique Titre",
+      "pricing": "Pricing"
+    },
+    "signaletique": {
+      "title": "Import Signalétique Titre",
+      "description": "Importez les données de signalétique et titres",
+      "selectFile": "Sélectionnez un fichier de signalétique"
+    },
+    "pricing": {
+      "title": "Import Pricing",
+      "description": "Importez les données de tarification",
+      "selectFile": "Sélectionnez un fichier de pricing"
+    },
+    "formats": {
+      "title": "ℹ️ Formats acceptés",
+      "csv": ".csv - Fichiers CSV",
+      "json": ".json - Fichiers JSON",
+      "xlsx": ".xlsx - Fichiers Excel"
+    },
+    "messages": {
+      "selectFile": "Veuillez sélectionner un fichier",
+      "success": "✅ Fichier \"{fileName}\" importé avec succès !",
+      "error": "❌ Erreur lors de l'import du fichier"
+    }
+  },
+  "signaletique": {
+    "title": "📊 Signalétique",
+    "subtitle": "Visualiser, modifier et supprimer les données",
+    "search": "🔍 Rechercher...",
+    "refresh": "Actualiser",
+    "loading": "Chargement des données...",
+    "total": "Total",
+    "noData": "Aucune donnée disponible",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cette entrée ?",
+    "deleteSuccess": "Entrée supprimée avec succès",
+    "deleteError": "Erreur lors de la suppression",
+    "updateSuccess": "Données mises à jour avec succès",
+    "updateError": "Erreur lors de la mise à jour",
+    "fields": {
+      "code": "Code",
+      "titre": "Titre",
+      "description": "Description",
+      "categorie": "Catégorie",
+      "statut": "Statut",
+      "actions": "Actions"
+    }
+  }
+}

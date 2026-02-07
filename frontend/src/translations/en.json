@@ -1,0 +1,73 @@
+{
+  "common": {
+    "back": "← Back",
+    "import": "Import",
+    "importing": "Importing...",
+    "chooseFile": "Choose file",
+    "administration": "Administration",
+    "welcome": "Welcome to your Portfolio application"
+  },
+  "home": {
+    "title": "Portfolio",
+    "adminButton": "🔧 Administration"
+  },
+  "admin": {
+    "title": "Administration",
+    "subtitle": "Portfolio Administration Panel",
+    "importData": "📥 Data Import",
+    "viewData": "Data Visualization",
+    "manageProjects": "Manage Projects",
+    "manageUsers": "Manage Users"
+  },
+  "import": {
+    "title": "📥 Data Import",
+    "subtitle": "Import your data files",
+    "tabs": {
+      "signaletique": "Title Information",
+      "pricing": "Pricing"
+    },
+    "signaletique": {
+      "title": "Title Information Import",
+      "description": "Import title and information data",
+      "selectFile": "Select a title information file"
+    },
+    "pricing": {
+      "title": "Pricing Import",
+      "description": "Import pricing data",
+      "selectFile": "Select a pricing file"
+    },
+    "formats": {
+      "title": "ℹ️ Accepted formats",
+      "csv": ".csv - CSV files",
+      "json": ".json - JSON files",
+      "xlsx": ".xlsx - Excel files"
+    },
+    "messages": {
+      "selectFile": "Please select a file",
+      "success": "✅ File \"{fileName}\" imported successfully!",
+      "error": "❌ Error importing file"
+    }
+  },
+  "signaletique": {
+    "title": "📊 Data Overview",
+    "subtitle": "View, edit and delete data",
+    "search": "🔍 Search...",
+    "refresh": "Refresh",
+    "loading": "Loading data...",
+    "total": "Total",
+    "noData": "No data available",
+    "confirmDelete": "Are you sure you want to delete this entry?",
+    "deleteSuccess": "Entry deleted successfully",
+    "deleteError": "Error deleting entry",
+    "updateSuccess": "Data updated successfully",
+    "updateError": "Error updating data",
+    "fields": {
+      "code": "Code",
+      "titre": "Title",
+      "description": "Description",
+      "categorie": "Category",
+      "statut": "Status",
+      "actions": "Actions"
+    }
+  }
+}
