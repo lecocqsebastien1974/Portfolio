@@ -28,7 +28,8 @@ function ImportData() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8001'}/api/import/signaletique/`, {
+      const apiBaseUrl = process.env.REACT_APP_API_URL || window.location.origin;
+      const response = await fetch(`${apiBaseUrl}/api/import/signaletique/`, {
         method: 'POST',
         body: formData,
       });

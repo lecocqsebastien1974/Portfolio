@@ -75,7 +75,7 @@ function SignaletiqueList() {
   const investmentTypes = [...new Set(data.map(item => item.donnees_supplementaires?.['Type d\'instr']).filter(Boolean))];
   const assetClasses = [...new Set(data.map(item => item.donnees_supplementaires?.['Classe d\'actifs']).filter(Boolean))];
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+  const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
 
   useEffect(() => {
     fetchData();
@@ -114,6 +114,24 @@ function SignaletiqueList() {
       }
     } catch (err) {
       alert(`${t('signaletique.deleteError')}: ${err.message}`);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm(t('signaletique.confirmDeleteAll'))) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/signaletique/clear/`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+
+      setData([]);
+      setSelectedItem(null);
+      alert(t('signaletique.deleteAllSuccess'));
+    } catch (err) {
+      alert(`${t('signaletique.deleteAllError')}: ${err.message}`);
     }
   };
 
@@ -281,6 +299,12 @@ function SignaletiqueList() {
         <h1>{t('signaletique.title')}</h1>
         <p>{t('signaletique.subtitle')}</p>
 
+        <div className="button-container">
+          <button className="btn btn-danger" onClick={handleDeleteAll}>
+            {t('signaletique.deleteAll')}
+          </button>
+        </div>
+
         <div className="filters-section">
           <div className="search-filter">
             <input
@@ -396,26 +420,71 @@ function SignaletiqueList() {
                     
                     <div className="details-grid">
                       <div className="detail-row">
-                        <span className="detail-label">Code:</span>
-                        <span className="detail-value">{selectedItem.code}</span>
-                      </div>
-                      
-                      <div className="detail-row">
                         <span className="detail-label">Nom:</span>
                         <span className="detail-value">
                           {selectedItem.donnees_supplementaires?.['Nom'] || selectedItem.titre || 'N/A'}
                         </span>
                       </div>
-                      
-                      {selectedItem.donnees_supplementaires && Object.entries(selectedItem.donnees_supplementaires)
-                        .filter(([key]) => key !== 'Code' && key !== 'code')
-                        .map(([key, value]) => (
-                          <div key={key} className="detail-row">
-                            <span className="detail-label">{key}:</span>
+                      {(() => {
+                        const ds = selectedItem.donnees_supplementaires || {};
+                        const normalizeKey = (key) => String(key)
+                          .normalize('NFD')
+                          .replace(/\p{Diacritic}/gu, '')
+                          .toLowerCase()
+                          .replace(/[^\p{L}\p{N}]+/gu, ' ')
+                          .replace(/\s+/gu, ' ')
+                          .trim();
+                        const dsKeyMap = new Map(
+                          Object.keys(ds).map((key) => [normalizeKey(key), key])
+                        );
+
+                        const orderedFields = [
+                          { label: 'ISIN', keys: ['ISIN', 'Isin', 'isin'] },
+                          { label: "Type d'instrument", keys: ["Type d'instrument", "Type d'instr", "Type d'instr."] },
+                          { label: "Classe d'actifs", keys: ["Classe d'actifs", "Classe d’actifs", "Classe d'actif"] },
+                          { label: 'Symbole', keys: ['Symbole'] },
+                          { label: 'Nom Long', keys: ['Nom Long', 'Nom long'] },
+                          { label: 'Taux (%)', keys: ['Taux (%)', 'Taux %', 'Taux'] },
+                          { label: 'Positions', keys: ['Positions'] },
+                          { label: 'Date de fin', keys: ['Date de fin'] },
+                          { label: 'Réplication', keys: ['Réplication', 'Replication'] },
+                          { label: 'Qualité crédit', keys: ['Qualité crédit', 'Qualité credit', 'Qualite crédit', 'Qualite credit'] },
+                          { label: 'Taille du Fonds', keys: ['Taille du Fonds'] },
+                          { label: 'Couverture de change', keys: ['Couverture de change'] },
+                          { label: 'Cap/Dis', keys: ['Cap/Dis', 'Cap-Dis', 'Cap - Dis'] },
+                          { label: 'Devise', keys: ['Devise'] },
+                          { label: 'TER (%)', keys: ['TER (%)', 'TER %', 'TER'] },
+                          { label: 'ESG', keys: ['ESG'] }
+                        ];
+
+                        const isExcludedKey = (normalized) => {
+                          if (/\bcode\b/.test(normalized)) return true;
+                          if (/\bnom\b/.test(normalized)) return true;
+                          if (/\btitre\b/.test(normalized)) return true;
+                          return false;
+                        };
+                        const seen = new Set();
+
+                        const orderedEntries = orderedFields
+                          .map((field) => {
+                            const key = field.keys
+                              .map((k) => dsKeyMap.get(normalizeKey(k)))
+                              .find(Boolean);
+                            if (!key) return null;
+                            const normalized = normalizeKey(key);
+                            if (seen.has(normalized) || isExcludedKey(normalized)) return null;
+                            seen.add(normalized);
+                            return { label: field.label, value: ds[key] };
+                          })
+                          .filter(Boolean);
+
+                        return orderedEntries.map(({ label, value }) => (
+                          <div key={label} className="detail-row">
+                            <span className="detail-label">{label}:</span>
                             <span className="detail-value">{value || '-'}</span>
                           </div>
-                        ))
-                      }
+                        ));
+                      })()}
                     </div>
                   </div>
                 ) : (

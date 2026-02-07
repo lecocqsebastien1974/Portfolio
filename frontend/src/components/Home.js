@@ -26,9 +26,12 @@ function Home() {
         <h1>{t('home.title')}</h1>
         <p>{t('common.welcome')}</p>
         
-        <div className="button-container">
+        <div className="button-container home-buttons">
           <Link to="/admin" className="btn btn-primary">
             {t('home.adminButton')}
+          </Link>
+          <Link to="/simulation" className="btn btn-home-simulation">
+            {t('home.simulationButton')}
           </Link>
         </div>
       </header>
