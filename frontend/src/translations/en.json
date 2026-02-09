@@ -18,6 +18,9 @@
     "menuTitle": "Target allocation",
     "nameLabel": "Portfolio name",
     "namePlaceholder": "e.g. Dynamic portfolio",
+    "titleFilterLabel": "Regex title filter",
+    "titleFilterPlaceholder": "e.g. ^MSCI|Europe",
+    "regexInvalid": "Invalid regex",
     "addLine": "+ Add line",
     "removeLine": "Remove",
     "selectTitle": "Select a title",
@@ -45,6 +48,7 @@
     "loadingPortfolios": "Loading portfolios...",
     "emptyPortfolios": "No target portfolios saved",
     "errorPortfolios": "Error loading portfolios",
+    "noResults": "No results",
     "edit": "Edit",
     "analyze": "Analyze",
     "delete": "Delete"

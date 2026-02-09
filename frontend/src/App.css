@@ -219,6 +219,59 @@ button:disabled {
   color: rgba(255, 255, 255, 0.5);
 }
 
+.title-suggest {
+  position: relative;
+  width: 100%;
+}
+
+.title-suggest-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  background: rgba(20, 22, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  z-index: 15;
+  padding: 6px;
+  text-align: left;
+}
+
+.title-suggest-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.title-suggest-item:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: translateX(2px);
+}
+
+.title-suggest-label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title-suggest-empty {
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+
 .data-table-container {
   width: 100%;
   max-width: 1200px;
@@ -1009,6 +1062,42 @@ button:disabled {
 
 .analysis-table thead {
   background: rgba(255, 255, 255, 0.06);
+}
+.analysis-summary {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.analysis-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.analysis-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+.analysis-summary-item strong {
+  color: #4facfe;
+}
+
+.analysis-summary-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  margin-bottom: 12px;
 }
 
 @media (max-width: 768px) {

@@ -72,6 +72,20 @@ function SignaletiqueList() {
     'Autre Secteur': ''
   });
 
+  const normalizeKey = (value) => String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const getDisplayName = (item) => {
+    const ds = item?.donnees_supplementaires || {};
+    const keyMap = new Map(Object.keys(ds).map((key) => [normalizeKey(key), key]));
+    const nameKey = keyMap.get(normalizeKey('Nom'));
+    return (nameKey && ds[nameKey]) || item?.titre || '';
+  };
+
   const investmentTypes = [...new Set(data.map(item => item.donnees_supplementaires?.['Type d\'instr']).filter(Boolean))];
   const assetClasses = [...new Set(data.map(item => item.donnees_supplementaires?.['Classe d\'actifs']).filter(Boolean))];
 
@@ -262,7 +276,7 @@ function SignaletiqueList() {
   };
 
   const filteredData = data.filter(item => {
-    const nomLong = item.donnees_supplementaires?.['Nom'] || item.titre || '';
+    const nomLong = getDisplayName(item);
     const typeInvest = item.donnees_supplementaires?.['Type d\'instr'] || '';
     const classeActif = item.donnees_supplementaires?.['Classe d\'actifs'] || '';
     
@@ -371,7 +385,7 @@ function SignaletiqueList() {
                   </div>
                 ) : (
                   filteredData.map((item) => {
-                    const nomLong = item.donnees_supplementaires?.['Nom'] || item.titre || 'Sans nom';
+                    const nomLong = getDisplayName(item) || 'Sans nom';
                     const typeInvest = item.donnees_supplementaires?.['Type d\'instr'] || '-';
                     const classeActif = item.donnees_supplementaires?.['Classe d\'actifs'] || '-';
                     
@@ -422,7 +436,7 @@ function SignaletiqueList() {
                       <div className="detail-row">
                         <span className="detail-label">Nom:</span>
                         <span className="detail-value">
-                          {selectedItem.donnees_supplementaires?.['Nom'] || selectedItem.titre || 'N/A'}
+                          {getDisplayName(selectedItem) || 'N/A'}
                         </span>
                       </div>
                       {(() => {
@@ -442,8 +456,8 @@ function SignaletiqueList() {
                           { label: 'ISIN', keys: ['ISIN', 'Isin', 'isin'] },
                           { label: "Type d'instrument", keys: ["Type d'instrument", "Type d'instr", "Type d'instr."] },
                           { label: "Classe d'actifs", keys: ["Classe d'actifs", "Classe d’actifs", "Classe d'actif"] },
+                          { label: 'CodeBank', keys: ['CodeBank', 'Code Bank'] },
                           { label: 'Symbole', keys: ['Symbole'] },
-                          { label: 'Nom Long', keys: ['Nom Long', 'Nom long'] },
                           { label: 'Taux (%)', keys: ['Taux (%)', 'Taux %', 'Taux'] },
                           { label: 'Positions', keys: ['Positions'] },
                           { label: 'Date de fin', keys: ['Date de fin'] },

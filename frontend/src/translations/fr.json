@@ -18,6 +18,9 @@
     "menuTitle": "Allocation cible",
     "nameLabel": "Nom du portefeuille",
     "namePlaceholder": "Ex: Portefeuille dynamique",
+    "titleFilterLabel": "Filtre regex des titres",
+    "titleFilterPlaceholder": "Ex: ^MSCI|Europe",
+    "regexInvalid": "Regex invalide",
     "addLine": "+ Ajouter une ligne",
     "removeLine": "Retirer",
     "selectTitle": "Selectionner un titre",
@@ -45,6 +48,7 @@
     "loadingPortfolios": "Chargement des portefeuilles...",
     "emptyPortfolios": "Aucun portefeuille cible enregistre",
     "errorPortfolios": "Erreur lors du chargement des portefeuilles",
+    "noResults": "Aucun resultat",
     "edit": "Modifier",
     "analyze": "Analyser",
     "delete": "Supprimer"

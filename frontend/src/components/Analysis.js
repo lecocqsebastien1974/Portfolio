@@ -33,6 +33,19 @@ function Analysis() {
     return Number.isNaN(parsed) ? 0 : parsed;
   }, []);
 
+  const getDisplayName = useCallback((ds, fallback) => {
+    if (!ds) return fallback;
+    const normalizeKey = (value) => String(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    const keyMap = new Map(Object.keys(ds).map((key) => [normalizeKey(key), key]));
+    const nameKey = keyMap.get(normalizeKey('Nom'));
+    return (nameKey && ds[nameKey]) || fallback;
+  }, []);
+
   const getValue = useCallback((ds, label) => {
     if (!ds) return 0;
     const keyMap = new Map(Object.keys(ds).map((key) => [normalizeKey(key), key]));
@@ -120,7 +133,7 @@ function Analysis() {
       const signaletique = signaletiqueMap.get(String(item.signaletique));
       const ds = signaletique?.donnees_supplementaires || {};
       const ratio = parseNumber(item.ratio);
-      const name = signaletique?.donnees_supplementaires?.['Nom'] || signaletique?.titre || `#${item.signaletique}`;
+      const name = getDisplayName(ds, signaletique?.titre || `#${item.signaletique}`);
       return {
         id: item.id || `${item.signaletique}`,
         name,
@@ -129,6 +142,20 @@ function Analysis() {
       };
     });
   }, [portfolio, signaletiqueMap, parseNumber]);
+
+  const getTotals = useCallback((fields) => {
+    return fields.map((field) => {
+      const total = rows.reduce((sum, row) => {
+        const value = getValue(row.ds, field);
+        return sum + (row.ratio * value);
+      }, 0);
+      return { field, total };
+    }).sort((a, b) => b.total - a.total);
+  }, [rows, getValue]);
+
+  const getTotalSum = useCallback((items) => {
+    return items.reduce((sum, item) => sum + item.total, 0);
+  }, []);
 
   const renderTable = (fields) => (
     <div className="analysis-frame">
@@ -201,6 +228,34 @@ function Analysis() {
             {rows.length === 0 && <p>{t('analysis.empty')}</p>}
             {rows.length > 0 && (
               <>
+                <div className="analysis-summary">
+                  <h3>{t('analysis.geoTitle')}</h3>
+                  <div className="analysis-summary-grid">
+                    {getTotals(geoFields).map((item) => (
+                      <div key={`geo-${item.field}`} className="analysis-summary-item">
+                        <span>{item.field}</span>
+                        <strong>{item.total.toFixed(2)}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="analysis-summary-total">
+                    <span>Total</span>
+                    <strong>{getTotalSum(getTotals(geoFields)).toFixed(2)}%</strong>
+                  </div>
+                  <h3>{t('analysis.sectorTitle')}</h3>
+                  <div className="analysis-summary-grid">
+                    {getTotals(sectorFields).map((item) => (
+                      <div key={`sector-${item.field}`} className="analysis-summary-item">
+                        <span>{item.field}</span>
+                        <strong>{item.total.toFixed(2)}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="analysis-summary-total">
+                    <span>Total</span>
+                    <strong>{getTotalSum(getTotals(sectorFields)).toFixed(2)}%</strong>
+                  </div>
+                </div>
                 <h3>{t('analysis.geoTitle')}</h3>
                 {renderTable(geoFields)}
                 <h3>{t('analysis.sectorTitle')}</h3>

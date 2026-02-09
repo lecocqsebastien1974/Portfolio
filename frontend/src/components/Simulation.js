@@ -9,7 +9,7 @@ function Simulation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rows, setRows] = useState([
-    { id: 1, titleId: '', ratio: '' }
+    { id: 1, titleId: '', titleText: '', ratio: '' }
   ]);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -18,6 +18,21 @@ function Simulation() {
   const [portfoliosLoading, setPortfoliosLoading] = useState(true);
   const [portfoliosError, setPortfoliosError] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [activeRowId, setActiveRowId] = useState(null);
+
+  const normalizeKey = (value) => String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const getDsValue = (ds, label) => {
+    if (!ds) return '';
+    const keyMap = new Map(Object.keys(ds).map((key) => [normalizeKey(key), key]));
+    const matchedKey = keyMap.get(normalizeKey(label));
+    return matchedKey ? ds[matchedKey] : '';
+  };
 
   const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
 
@@ -71,10 +86,27 @@ function Simulation() {
 
   const titleOptions = useMemo(() => {
     return titles.map((item) => {
-      const label = item.donnees_supplementaires?.['Nom'] || item.titre || item.code || `#${item.id}`;
+      const ds = item.donnees_supplementaires || {};
+      const name = getDsValue(ds, 'Nom') || item.titre || '';
+      const code = item.code || ds['Code'] || '';
+      const label = name || code || `#${item.id}`;
       return { value: item.id, label };
     });
   }, [titles]);
+
+  const getFilteredOptions = useCallback((filterValue) => {
+    const filter = (filterValue || '').trim();
+    if (!filter) return titleOptions.slice(0, 20);
+    try {
+      const regex = new RegExp(filter, 'i');
+      return titleOptions.filter((option) => regex.test(option.label)).slice(0, 50);
+    } catch (err) {
+      const lowered = filter.toLowerCase();
+      return titleOptions
+        .filter((option) => option.label.toLowerCase().includes(lowered))
+        .slice(0, 50);
+    }
+  }, [titleOptions]);
 
   const titleMap = useMemo(() => {
     return new Map(titleOptions.map((option) => [String(option.value), option.label]));
@@ -102,14 +134,14 @@ function Simulation() {
 
   const resetForm = () => {
     setName('');
-    setRows([{ id: Date.now(), titleId: '', ratio: '' }]);
+    setRows([{ id: Date.now(), titleId: '', titleText: '', ratio: '' }]);
     setEditingId(null);
   };
 
   const handleAddRow = () => {
     setRows((prev) => [
       ...prev,
-      { id: Date.now(), titleId: '', ratio: '' }
+      { id: Date.now(), titleId: '', titleText: '', ratio: '' }
     ]);
   };
 
@@ -123,6 +155,33 @@ function Simulation() {
       return { ...row, [field]: value };
     }));
   };
+
+  const handleTitleTextChange = (id, value) => {
+    const trimmed = value.trim();
+    const match = titleOptions.find((option) => option.label === trimmed);
+    setRows((prev) => prev.map((row) => {
+      if (row.id !== id) return row;
+      return {
+        ...row,
+        titleText: value,
+        titleId: trimmed && match ? String(match.value) : ''
+      };
+    }));
+    setActiveRowId(id);
+  };
+
+  const handleTitleSelect = (id, option) => {
+    setRows((prev) => prev.map((row) => {
+      if (row.id !== id) return row;
+      return {
+        ...row,
+        titleText: option.label,
+        titleId: String(option.value)
+      };
+    }));
+    setActiveRowId(null);
+  };
+
 
   const handleSave = async () => {
     if (!isValid) return;
@@ -181,14 +240,18 @@ function Simulation() {
     setEditingId(portfolio.id);
     setName(portfolio.name || '');
     setRows(
-      (portfolio.items || []).map((item) => ({
-        id: item.id || Date.now() + Math.random(),
-        titleId: String(item.signaletique),
-        ratio: String(item.ratio)
-      }))
+      (portfolio.items || []).map((item) => {
+        const titleId = String(item.signaletique);
+        return {
+          id: item.id || Date.now() + Math.random(),
+          titleId,
+          titleText: titleMap.get(titleId) || '',
+          ratio: String(item.ratio)
+        };
+      })
     );
     if (!portfolio.items || portfolio.items.length === 0) {
-      setRows([{ id: Date.now(), titleId: '', ratio: '' }]);
+      setRows([{ id: Date.now(), titleId: '', titleText: '', ratio: '' }]);
     }
     setStatusMessage(null);
   };
@@ -285,18 +348,44 @@ function Simulation() {
               <div key={row.id} className="simulation-row">
                 <div className="simulation-field">
                   <label>{t('simulation.titleLabel')}</label>
-                  <select
-                    value={row.titleId}
-                    onChange={(e) => handleRowChange(row.id, 'titleId', e.target.value)}
-                    disabled={loading || !!error}
-                  >
-                    <option value="">{t('simulation.selectTitle')}</option>
-                    {titleOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="title-suggest">
+                    <input
+                      type="text"
+                      value={row.titleText}
+                      onChange={(e) => handleTitleTextChange(row.id, e.target.value)}
+                      onFocus={() => setActiveRowId(row.id)}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setActiveRowId((current) => (current === row.id ? null : current));
+                        }, 150);
+                      }}
+                      placeholder={t('simulation.selectTitle')}
+                      disabled={loading || !!error}
+                      autoComplete="off"
+                    />
+                    {activeRowId === row.id && (
+                      <div className="title-suggest-list">
+                        {getFilteredOptions(row.titleText).map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="title-suggest-item"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              handleTitleSelect(row.id, option);
+                            }}
+                          >
+                            <span className="title-suggest-label">{option.label}</span>
+                          </button>
+                        ))}
+                        {getFilteredOptions(row.titleText).length === 0 && (
+                          <div className="title-suggest-empty">
+                            {t('simulation.noResults')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="simulation-field simulation-ratio">
                   <label>{t('simulation.ratioLabel')}</label>
@@ -322,6 +411,7 @@ function Simulation() {
               </div>
             ))}
           </div>
+
 
           <div className="simulation-total">
             <span>{t('simulation.totalLabel')}</span>
