@@ -94,6 +94,22 @@ function Simulation() {
     });
   }, [titles]);
 
+  const normalizedTitleMap = useMemo(() => {
+    const map = new Map();
+    titleOptions.forEach((option) => {
+      const normalized = normalizeKey(option.label);
+      if (normalized && !map.has(normalized)) {
+        map.set(normalized, option);
+      }
+    });
+    return map;
+  }, [titleOptions, normalizeKey]);
+
+  const findTitleOptionByText = useCallback((value) => {
+    const normalized = normalizeKey(value || '');
+    return normalized ? normalizedTitleMap.get(normalized) : null;
+  }, [normalizedTitleMap, normalizeKey]);
+
   const getFilteredOptions = useCallback((filterValue) => {
     const filter = (filterValue || '').trim();
     if (!filter) return titleOptions.slice(0, 20);
@@ -132,6 +148,10 @@ function Simulation() {
     return rows.every((row) => row.titleId && parseFloat(row.ratio) > 0);
   }, [rows, name, isTotalValid, hasDuplicates]);
 
+  const hasMissingFields = useMemo(() => {
+    return rows.some((row) => !row.titleId || !(parseFloat(row.ratio) > 0));
+  }, [rows]);
+
   const resetForm = () => {
     setName('');
     setRows([{ id: Date.now(), titleId: '', titleText: '', ratio: '' }]);
@@ -158,7 +178,7 @@ function Simulation() {
 
   const handleTitleTextChange = (id, value) => {
     const trimmed = value.trim();
-    const match = titleOptions.find((option) => option.label === trimmed);
+    const match = findTitleOptionByText(trimmed);
     setRows((prev) => prev.map((row) => {
       if (row.id !== id) return row;
       return {
@@ -423,6 +443,11 @@ function Simulation() {
           {hasDuplicates && (
             <div className="simulation-warning">
               {t('simulation.duplicateTitles')}
+            </div>
+          )}
+          {hasMissingFields && (
+            <div className="simulation-warning">
+              {t('simulation.missingFields')}
             </div>
           )}
 

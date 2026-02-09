@@ -30,6 +30,7 @@
     "totalOk": "Total valide (100%)",
     "totalNotOk": "Le total doit etre egal a 100%",
     "duplicateTitles": "Chaque titre doit etre unique",
+    "missingFields": "Chaque ligne doit avoir un titre et un ratio positif",
     "loadingTitles": "Chargement des titres...",
     "errorTitles": "Erreur lors du chargement des titres",
     "emptyTitles": "Aucun titre disponible dans la signaletique",

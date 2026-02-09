@@ -30,6 +30,7 @@
     "totalOk": "Total is valid (100%)",
     "totalNotOk": "Total must be 100%",
     "duplicateTitles": "Each title must be unique",
+    "missingFields": "Each row needs a title and a positive ratio",
     "loadingTitles": "Loading titles...",
     "errorTitles": "Error loading titles",
     "emptyTitles": "No titles available in signaletique",
