@@ -33,6 +33,9 @@ function Home() {
           <Link to="/simulation" className="btn btn-home-simulation">
             {t('home.simulationButton')}
           </Link>
+          <Link to="/portfolios" className="btn btn-home-portfolios">
+            💼 Portefeuilles
+          </Link>
         </div>
       </header>
     </div>

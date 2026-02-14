@@ -80,7 +80,8 @@
     "subtitle": "Importez vos fichiers de données",
     "tabs": {
       "signaletique": "Signalétique Titre",
-      "pricing": "Pricing"
+      "pricing": "Pricing",
+      "templates": "Templates"
     },
     "signaletique": {
       "title": "Import Signalétique Titre",
@@ -91,6 +92,12 @@
       "title": "Import Pricing",
       "description": "Importez les données de tarification",
       "selectFile": "Sélectionnez un fichier de pricing"
+    },
+    "templates": {
+      "title": "📋 Modèles de fichiers",
+      "description": "Téléchargez les modèles de fichiers pour l'import",
+      "signaletique": "Modèle Signalétique Titre",
+      "note": "Ces modèles contiennent tous les champs nécessaires. Remplissez-les avec vos données et importez-les."
     },
     "formats": {
       "title": "ℹ️ Formats acceptés",

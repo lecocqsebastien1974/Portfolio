@@ -4,7 +4,9 @@ from .models import (
     Signaletique,
     ImportLog,
     TargetPortfolio,
-    TargetPortfolioItem
+    TargetPortfolioItem,
+    RealPortfolio,
+    Transaction
 )
 
 
@@ -83,3 +85,19 @@ class TargetPortfolioSerializer(serializers.ModelSerializer):
             ])
 
         return instance
+
+
+class TransactionSerializer(serializers.ModelSerializer):
+    signaletique_display = serializers.CharField(source='signaletique.titre', read_only=True)
+    
+    class Meta:
+        model = Transaction
+        fields = '__all__'
+
+
+class RealPortfolioSerializer(serializers.ModelSerializer):
+    transactions = TransactionSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = RealPortfolio
+        fields = ['id', 'name', 'description', 'date_creation', 'date_modification', 'transactions']

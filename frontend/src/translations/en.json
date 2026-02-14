@@ -80,7 +80,8 @@
     "subtitle": "Import your data files",
     "tabs": {
       "signaletique": "Title Information",
-      "pricing": "Pricing"
+      "pricing": "Pricing",
+      "templates": "Templates"
     },
     "signaletique": {
       "title": "Title Information Import",
@@ -91,6 +92,12 @@
       "title": "Pricing Import",
       "description": "Import pricing data",
       "selectFile": "Select a pricing file"
+    },
+    "templates": {
+      "title": "📋 File templates",
+      "description": "Download file templates for import",
+      "signaletique": "Title Information Template",
+      "note": "These templates contain all required fields. Fill them with your data and import them."
     },
     "formats": {
       "title": "ℹ️ Accepted formats",

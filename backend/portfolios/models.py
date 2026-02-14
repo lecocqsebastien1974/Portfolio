@@ -33,6 +33,7 @@ class ImportLog(models.Model):
     TYPE_CHOICES = [
         ('signaletique', 'Signalétique'),
         ('pricing', 'Pricing'),
+        ('transactions', 'Transactions'),
     ]
     
     type_import = models.CharField(max_length=50, choices=TYPE_CHOICES)
@@ -88,3 +89,54 @@ class TargetPortfolioItem(models.Model):
 
     def __str__(self):
         return f"{self.portfolio.name} - {self.signaletique.code}"
+
+
+class RealPortfolio(models.Model):
+    """Portefeuille réel avec transactions"""
+    name = models.CharField(max_length=200, unique=True, verbose_name="Nom")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Portefeuille réel"
+        verbose_name_plural = "Portefeuilles réels"
+        ordering = ['-date_creation']
+
+    def __str__(self):
+        return self.name
+
+
+class Transaction(models.Model):
+    """Transaction d'achat ou de vente"""
+    TYPE_CHOICES = [
+        ('ACHAT', 'Achat'),
+        ('VENTE', 'Vente'),
+    ]
+    
+    portfolio = models.ForeignKey(
+        RealPortfolio,
+        on_delete=models.CASCADE,
+        related_name='transactions'
+    )
+    signaletique = models.ForeignKey(
+        Signaletique,
+        on_delete=models.PROTECT,
+        related_name='transactions'
+    )
+    date = models.DateField(verbose_name="Date")
+    type_operation = models.CharField(max_length=10, choices=TYPE_CHOICES, verbose_name="Type")
+    quantite = models.DecimalField(max_digits=15, decimal_places=4, verbose_name="Quantité")
+    prix_unitaire = models.DecimalField(max_digits=15, decimal_places=4, verbose_name="Prix unitaire")
+    devise = models.CharField(max_length=10, default='EUR', verbose_name="Devise")
+    
+    # Métadonnées
+    date_creation = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Transaction"
+        verbose_name_plural = "Transactions"
+        ordering = ['date', 'id']
+    
+    def __str__(self):
+        return f"{self.type_operation} {self.quantite} {self.signaletique.code} @ {self.prix_unitaire} ({self.date})"

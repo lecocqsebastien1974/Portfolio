@@ -8,6 +8,8 @@ import ImportData from './components/ImportData';
 import SignaletiqueList from './components/SignaletiqueList';
 import Simulation from './components/Simulation';
 import Analysis from './components/Analysis';
+import Portfolios from './components/Portfolios';
+import TransactionsList from './components/TransactionsList';
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
         <div className="App">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/portfolios" element={<Portfolios />} />
+            <Route path="/portfolios/:portfolioId" element={<TransactionsList />} />
             <Route path="/simulation" element={<Simulation />} />
             <Route path="/analysis/:id" element={<Analysis />} />
             <Route path="/admin" element={<Admin />} />

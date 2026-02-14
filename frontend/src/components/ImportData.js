@@ -68,6 +68,23 @@ function ImportData() {
           <p>{t('import.pricing.description')}</p>
         </div>
       );
+    } else if (activeTab === 'templates') {
+      return (
+        <div className="tab-content">
+          <h2>{t('import.templates.title')}</h2>
+          <p>{t('import.templates.description')}</p>
+          <div className="template-list">
+            <a
+              href="/templates/signaletique_template.csv"
+              className="btn btn-secondary"
+              download
+            >
+              {t('import.templates.signaletique')}
+            </a>
+          </div>
+          <p className="template-note">{t('import.templates.note')}</p>
+        </div>
+      );
     }
   };
 
@@ -94,11 +111,18 @@ function ImportData() {
           >
             {t('import.tabs.pricing')}
           </button>
+          <button
+            className={`tab ${activeTab === 'templates' ? 'active' : ''}`}
+            onClick={() => setActiveTab('templates')}
+          >
+            {t('import.tabs.templates')}
+          </button>
         </div>
 
         {renderTabContent()}
         
-        <div className="import-container">
+        {activeTab !== 'templates' && (
+          <div className="import-container">
           <div className="file-input-wrapper">
             <input 
               type="file" 
@@ -135,6 +159,7 @@ function ImportData() {
             </ul>
           </div>
         </div>
+        )}
       </header>
     </div>
   );
