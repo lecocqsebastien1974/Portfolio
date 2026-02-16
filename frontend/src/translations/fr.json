@@ -10,7 +10,8 @@
   "home": {
     "title": "Portfolio",
     "adminButton": "🔧 Administration",
-    "simulationButton": "🎯 Creer un portefeuille cible"
+    "simulationButton": "🎯 Creer un portefeuille cible",
+    "portfoliosButton": "💼 Construction de portefeuilles"
   },
   "simulation": {
     "title": "Simulation",

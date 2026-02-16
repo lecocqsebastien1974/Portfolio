@@ -56,7 +56,48 @@ function Portfolios() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setMessage(`✅ Import réussi !\n📊 ${data.details.succes} transaction(s) importée(s)${data.details.erreurs > 0 ? `\n⚠️ ${data.details.erreurs} erreur(s)` : ''}`);
+        let message = `✅ Import réussi !\n📊 ${data.details.succes} transaction(s) importée(s)`;
+        
+        if (data.details.erreurs > 0) {
+          message += `\n⚠️ ${data.details.erreurs} erreur(s)`;
+        }
+        
+        // Gérer les ISINs inconnus
+        if (data.isins_inconnus && data.isins_inconnus.count > 0) {
+          message += `\n\n⚠️ ${data.isins_inconnus.count} ISIN(s) inconnu(s) du système portfolio`;
+          message += '\n📥 Un fichier de signalétique a été préparé pour vous.';
+          
+          // Créer un lien de téléchargement
+          if (data.isins_inconnus.csv_file_url) {
+            const downloadUrl = `${apiBaseUrl}${data.isins_inconnus.csv_file_url}`;
+            message += `\n\n👉 Cliquez ici pour télécharger : `;
+            
+            // Afficher le message avec un lien cliquable
+            setMessage(
+              <div>
+                {message.split('\n').map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+                <a 
+                  href={downloadUrl} 
+                  download 
+                  className="btn btn-info"
+                  style={{marginTop: '10px'}}
+                >
+                  📥 Télécharger le fichier de signalétique
+                </a>
+              </div>
+            );
+            
+            setFile(null);
+            const fileInput = document.getElementById('file-upload');
+            if (fileInput) fileInput.value = '';
+            fetchPortfolios();
+            return;
+          }
+        }
+        
+        setMessage(message);
         setFile(null);
         
         // Réinitialiser l'input file
@@ -75,6 +116,30 @@ function Portfolios() {
     }
   };
 
+  const handleDeletePortfolio = async (portfolioId, portfolioName) => {
+    const confirmation = window.confirm(`Vous allez supprimer un portefeuille. En êtes-vous certain?`);
+    
+    if (!confirmation) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/real-portfolios/${portfolioId}/`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok || response.status === 204) {
+        setMessage(`✅ Portefeuille "${portfolioName}" supprimé avec succès`);
+        // Rafraîchir la liste
+        fetchPortfolios();
+      } else {
+        setMessage(`❌ Erreur lors de la suppression`);
+      }
+    } catch (error) {
+      setMessage(`❌ Erreur: ${error.message}`);
+    }
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -82,8 +147,45 @@ function Portfolios() {
           {t('common.back')}
         </Link>
         
-        <h1>💼 Portefeuilles Réels</h1>
+        <h1>💼 Mes portefeuilles</h1>
         <p>Gérez vos transactions d'achat et de vente</p>
+        
+        <div className="portfolios-list">
+          <h2>📋 Mes Portefeuilles</h2>
+          
+          {loading ? (
+            <p>Chargement...</p>
+          ) : portfolios.length === 0 ? (
+            <p>Aucun portefeuille. Importez des transactions pour commencer.</p>
+          ) : (
+            <div className="portfolio-cards">
+              {portfolios.map(portfolio => (
+                <div key={portfolio.id} className="portfolio-card">
+                  <h3>{portfolio.name}</h3>
+                  <div className="portfolio-stats">
+                    <span className="stat">
+                      📊 {portfolio.transactions?.length || 0} transaction(s)
+                    </span>
+                  </div>
+                  <div className="portfolio-actions-vertical">
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => window.location.href = `/portfolios/${portfolio.id}`}
+                    >
+                      Voir détails
+                    </button>
+                    <button 
+                      className="btn btn-danger"
+                      onClick={() => handleDeletePortfolio(portfolio.id, portfolio.name)}
+                    >
+                      🗑️ Supprimer
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         
         <div className="import-container">
           <h2>📥 Importer des transactions</h2>
@@ -113,36 +215,6 @@ function Portfolios() {
           {message && (
             <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
               {message}
-            </div>
-          )}
-        </div>
-        
-        <div className="portfolios-list">
-          <h2>📋 Mes Portefeuilles</h2>
-          
-          {loading ? (
-            <p>Chargement...</p>
-          ) : portfolios.length === 0 ? (
-            <p>Aucun portefeuille. Importez des transactions pour commencer.</p>
-          ) : (
-            <div className="portfolio-cards">
-              {portfolios.map(portfolio => (
-                <div key={portfolio.id} className="portfolio-card">
-                  <h3>{portfolio.name}</h3>
-                  <p>{portfolio.description}</p>
-                  <div className="portfolio-stats">
-                    <span className="stat">
-                      📊 {portfolio.transactions?.length || 0} transaction(s)
-                    </span>
-                  </div>
-                  <button 
-                    className="btn btn-secondary"
-                    onClick={() => window.location.href = `/portfolios/${portfolio.id}`}
-                  >
-                    Voir détails
-                  </button>
-                </div>
-              ))}
             </div>
           )}
         </div>

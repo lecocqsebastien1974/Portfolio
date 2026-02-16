@@ -111,6 +111,27 @@ function SignaletiqueList() {
     }
   };
 
+  const handleExportCSV = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/signaletique/export/`);
+      if (!response.ok) throw new Error('Erreur lors de l\'export');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'signaletique_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      alert('✅ Export CSV réussi !');
+    } catch (err) {
+      alert(`❌ Erreur lors de l'export: ${err.message}`);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm(t('signaletique.confirmDelete'))) return;
 
@@ -359,6 +380,10 @@ function SignaletiqueList() {
             
             <button className="btn btn-primary" onClick={fetchData}>
               🔄 Actualiser
+            </button>
+            
+            <button className="btn btn-info" onClick={handleExportCSV}>
+              💾 Exporter CSV
             </button>
           </div>
         </div>

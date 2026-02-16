@@ -1007,6 +1007,17 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.portfolio-actions-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.portfolio-actions-vertical .btn {
+  width: 100%;
+}
+
 .portfolio-total {
   color: rgba(255, 255, 255, 0.75);
   font-size: 0.95rem;

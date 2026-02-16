@@ -5,6 +5,7 @@ urlpatterns = [
     path('health/', views.health_check, name='health_check'),
     path('import/signaletique/', views.import_signaletique, name='import_signaletique'),
     path('signaletique/', views.list_signaletique, name='list_signaletique'),
+    path('signaletique/export/', views.export_signaletique_csv, name='export_signaletique_csv'),
     path('signaletique/clear/', views.clear_signaletique, name='clear_signaletique'),
     path('signaletique/<int:pk>/', views.signaletique_detail, name='signaletique_detail'),
     path('import/logs/', views.import_logs, name='import_logs'),

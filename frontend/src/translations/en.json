@@ -10,7 +10,8 @@
   "home": {
     "title": "Portfolio",
     "adminButton": "🔧 Administration",
-    "simulationButton": "🎯 Create a target portfolio"
+    "simulationButton": "🎯 Create a target portfolio",
+    "portfoliosButton": "💼 Portfolio Construction"
   },
   "simulation": {
     "title": "Simulation",

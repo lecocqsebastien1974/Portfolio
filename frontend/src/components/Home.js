@@ -34,7 +34,7 @@ function Home() {
             {t('home.simulationButton')}
           </Link>
           <Link to="/portfolios" className="btn btn-home-portfolios">
-            💼 Portefeuilles
+            {t('home.portfoliosButton')}
           </Link>
         </div>
       </header>
