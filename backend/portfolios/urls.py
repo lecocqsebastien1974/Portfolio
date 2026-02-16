@@ -1,7 +1,26 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from . import auth_views
+from . import admin_views
+
+# Router pour les ViewSets d'administration
+admin_router = DefaultRouter()
+admin_router.register(r'categories', admin_views.AssetCategoryViewSet, basename='category')
+admin_router.register(r'users', admin_views.UserManagementViewSet, basename='user')
 
 urlpatterns = [
+    # Routes d'authentification
+    path('auth/login/', auth_views.login_view, name='login'),
+    path('auth/logout/', auth_views.logout_view, name='logout'),
+    path('auth/me/', auth_views.current_user, name='current_user'),
+    path('auth/check/', auth_views.check_auth, name='check_auth'),
+    
+    # Routes d'administration (réservées aux superusers)
+    path('admin/check-superuser/', admin_views.check_superuser, name='check_superuser'),
+    path('admin/', include(admin_router.urls)),
+    
+    # Routes existantes
     path('health/', views.health_check, name='health_check'),
     path('import/signaletique/', views.import_signaletique, name='import_signaletique'),
     path('signaletique/', views.list_signaletique, name='list_signaletique'),

@@ -63,6 +63,7 @@ def import_signaletique(request):
         
         nombre_succes = 0
         nombre_erreurs = 0
+        nombre_ignores = 0
         erreurs = []
 
         rows = list(ws.iter_rows(min_row=2, values_only=True))
@@ -72,23 +73,8 @@ def import_signaletique(request):
                 return value.isoformat()
             return value
 
-        # Si la colonne ISIN existe, supprimer les lignes en base qui ne sont pas dans le fichier
-        isin_header = next((h for h in headers if h in ['ISIN', 'Isin', 'isin']), None)
-        if isin_header:
-            isin_index = headers.index(isin_header)
-            isin_values = set()
-            for row in rows:
-                isin_raw = row[isin_index] if isin_index < len(row) else None
-                isin_value = str(isin_raw).strip() if isin_raw is not None else ''
-                if isin_value:
-                    isin_values.add(isin_value)
-
-            if isin_values:
-                Signaletique.objects.filter(
-                    models.Q(isin__isnull=True) |
-                    models.Q(isin='') |
-                    ~models.Q(isin__in=isin_values)
-                ).exclude(target_portfolio_items__isnull=False).delete()
+        # Ne rien supprimer ni désactiver - l'import crée ou met à jour uniquement
+        # Les signalétiques non présentes dans le fichier restent inchangées
 
         # Parcourir les lignes (à partir de la ligne 2)
         for row_idx, row in enumerate(rows, start=2):
@@ -108,9 +94,18 @@ def import_signaletique(request):
                     row_data.get('ISIN') or 
                     row_data.get('isin')
                 )
-                isin_value = str(isin_raw).strip() if isin_raw is not None else None
+                isin_value = str(isin_raw).strip().upper() if isin_raw is not None else None
                 if isin_value == "":
                     isin_value = None
+                
+                # Validation de l'ISIN (doit avoir 12 caractères)
+                if isin_value and len(isin_value) != 12:
+                    erreurs.append({
+                        'ligne': row_idx,
+                        'erreur': f'ISIN invalide (longueur {len(isin_value)} au lieu de 12): {isin_value}'
+                    })
+                    nombre_erreurs += 1
+                    continue
                 
                 # Code généré à partir de ISIN ou auto-incrémenté
                 if isin_value:
@@ -145,15 +140,21 @@ def import_signaletique(request):
                     continue
 
                 if isin_value:
-                    signaletique, created = Signaletique.objects.update_or_create(
-                        isin=isin_value,
-                        defaults=defaults
-                    )
+                    # Ne rien faire si le titre existe déjà (pas de mise à jour)
+                    if Signaletique.objects.filter(isin=isin_value).exists():
+                        # Titre déjà existant, on le skip
+                        nombre_ignores += 1
+                        continue
+                    else:
+                        # Créer le nouveau titre
+                        signaletique = Signaletique.objects.create(**defaults)
                 else:
-                    signaletique, created = Signaletique.objects.update_or_create(
-                        code=str(code),
-                        defaults=defaults
-                    )
+                    # Sans ISIN, vérifier par code
+                    if Signaletique.objects.filter(code=str(code)).exists():
+                        nombre_ignores += 1
+                        continue
+                    else:
+                        signaletique = Signaletique.objects.create(**defaults)
                 
                 nombre_succes += 1
                 
@@ -181,6 +182,7 @@ def import_signaletique(request):
                 'lignes_totales': ws.max_row - 1,
                 'succes': nombre_succes,
                 'erreurs': nombre_erreurs,
+                'ignores': nombre_ignores,
                 'liste_erreurs': erreurs[:10] if erreurs else []  # Limiter à 10 erreurs
             }
         })
@@ -214,9 +216,11 @@ def list_signaletique(request):
 
 @api_view(['POST'])
 def clear_signaletique(request):
-    deleted_count = Signaletique.objects.count()
-    Signaletique.objects.all().delete()
-    return Response({'success': True, 'deleted': deleted_count})
+    # Suppression désactivée - les signalétiques ne peuvent pas être supprimées
+    return Response(
+        {'error': 'La suppression des signalétiques est désactivée pour préserver l\'intégrité des données'},
+        status=status.HTTP_403_FORBIDDEN
+    )
 
 
 @api_view(['GET'])
@@ -288,10 +292,10 @@ def signaletique_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
-        signaletique.delete()
+        # Suppression désactivée - les signalétiques ne peuvent pas être supprimées
         return Response(
-            {'success': True, 'message': 'Signalétique supprimée'},
-            status=status.HTTP_204_NO_CONTENT
+            {'error': 'La suppression des signalétiques est désactivée pour préserver l\'intégrité des données'},
+            status=status.HTTP_403_FORBIDDEN
         )
 
 
@@ -430,6 +434,7 @@ def import_transactions(request):
         
         nombre_succes = 0
         nombre_erreurs = 0
+        nombre_doublons = 0
         erreurs = []
         isins_inconnus = set()
         
@@ -465,8 +470,10 @@ def import_transactions(request):
                     ''
                 ).strip().upper()
                 
-                # ISIN
+                # ISIN - normaliser en enlevant les espaces et en majuscules
                 isin = row_data.get('Isin') or row_data.get('ISIN') or row_data.get('isin')
+                if isin:
+                    isin = str(isin).strip().upper()
                 
                 # Quantité
                 quantite = (
@@ -493,6 +500,7 @@ def import_transactions(request):
                     date_transaction = date.today()
                     erreurs.append({
                         'ligne': row_idx,
+                        'type': 'warning',
                         'erreur': 'Date manquante, date du jour utilisée'
                     })
                 
@@ -506,6 +514,7 @@ def import_transactions(request):
                     
                     erreurs.append({
                         'ligne': row_idx,
+                        'type': 'erreur',
                         'erreur': f'Champs obligatoires manquants: {", ".join(missing_fields)}'
                     })
                     nombre_erreurs += 1
@@ -521,7 +530,17 @@ def import_transactions(request):
                     defaults={'description': f'Portefeuille {nom_portfolio}'}
                 )
                 
-                # Récupérer la signalétique
+                # Validation stricte : l'ISIN doit avoir exactement 12 caractères
+                if len(isin) != 12:
+                    erreurs.append({
+                        'ligne': row_idx,
+                        'type': 'erreur',
+                        'erreur': f"ISIN invalide (longueur {len(isin)} au lieu de 12): {isin}. Les ISINs doivent avoir exactement 12 caractères."
+                    })
+                    nombre_erreurs += 1
+                    continue
+                
+                # Récupérer la signalétique - Recherche exacte uniquement
                 try:
                     signaletique = Signaletique.objects.get(isin=isin)
                 except Signaletique.DoesNotExist:
@@ -534,6 +553,7 @@ def import_transactions(request):
                     )
                     erreurs.append({
                         'ligne': row_idx,
+                        'type': 'warning',
                         'erreur': f"L'ISIN {isin} est inconnu du système portfolio"
                     })
                 
@@ -552,9 +572,10 @@ def import_transactions(request):
                 
                 if existing_transaction:
                     # Transaction déjà existante, on la saute
-                    nombre_erreurs += 1
+                    nombre_doublons += 1
                     erreurs.append({
                         'ligne': row_idx,
+                        'type': 'doublon',
                         'erreur': 'Transaction déjà importée (doublon détecté)'
                     })
                 else:
@@ -575,6 +596,7 @@ def import_transactions(request):
                 nombre_erreurs += 1
                 erreurs.append({
                     'ligne': row_idx,
+                    'type': 'erreur',
                     'erreur': str(e)
                 })
         
@@ -638,6 +660,7 @@ def import_transactions(request):
                 'colonnes_detectees': headers,
                 'lignes_totales': ws.max_row - 1,
                 'succes': nombre_succes,
+                'doublons': nombre_doublons,
                 'erreurs': nombre_erreurs,
                 'liste_erreurs': erreurs[:10] if erreurs else []
             }

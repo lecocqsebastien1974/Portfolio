@@ -1,4 +1,11 @@
 {
+  "login": {
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign In",
+    "loading": "Signing in...",
+    "logout": "Sign Out"
+  },
   "common": {
     "back": "← Back",
     "import": "Import",
@@ -9,7 +16,7 @@
   },
   "home": {
     "title": "Portfolio",
-    "adminButton": "🔧 Administration",
+    "adminButton": "� Signaletique",
     "simulationButton": "🎯 Create a target portfolio",
     "portfoliosButton": "💼 Portfolio Construction"
   },

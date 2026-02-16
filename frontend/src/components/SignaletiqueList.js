@@ -6,6 +6,7 @@ import '../App.css';
 function SignaletiqueList() {
   const { t, language, changeLanguage } = useLanguage();
   const [data, setData] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -93,8 +94,24 @@ function SignaletiqueList() {
 
   useEffect(() => {
     fetchData();
+    fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:8001/api/admin/categories/', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const categoriesData = await response.json();
+        const categoriesList = Array.isArray(categoriesData) ? categoriesData : (categoriesData.results || []);
+        setCategories(categoriesList);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des catégories:', err);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -132,43 +149,7 @@ function SignaletiqueList() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('signaletique.confirmDelete'))) return;
 
-    try {
-      const response = await fetch(`${API_URL}/api/signaletique/${id}/`, {
-        method: 'DELETE',
-      });
-      
-      if (response.ok || response.status === 204) {
-        setData(data.filter(item => item.id !== id));
-        setSelectedItem(null);
-        alert(t('signaletique.deleteSuccess'));
-      } else {
-        throw new Error('Erreur lors de la suppression');
-      }
-    } catch (err) {
-      alert(`${t('signaletique.deleteError')}: ${err.message}`);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!window.confirm(t('signaletique.confirmDeleteAll'))) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/signaletique/clear/`, {
-        method: 'POST'
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de la suppression');
-
-      setData([]);
-      setSelectedItem(null);
-      alert(t('signaletique.deleteAllSuccess'));
-    } catch (err) {
-      alert(`${t('signaletique.deleteAllError')}: ${err.message}`);
-    }
-  };
 
   const openAddModal = () => {
     setModalMode('add');
@@ -253,15 +234,32 @@ function SignaletiqueList() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Normaliser l'ISIN (strip et uppercase)
+    const normalizedIsin = formData.Isin ? formData.Isin.trim().toUpperCase() : '';
+    
+    // Valider l'ISIN si fourni
+    if (normalizedIsin && normalizedIsin.length !== 12) {
+      alert("L'ISIN doit avoir exactement 12 caractères ou être vide");
+      return;
+    }
+    
     try {
       const payload = {
-        code: formData.code,
         titre: formData.Nom,
+        isin: normalizedIsin || null,
+        categorie: formData['Classe d\'actifs'] || null,
+        statut: formData['Type d\'instr'] || null,
         donnees_supplementaires: {
           ...formData,
-          Code: formData.code
+          Isin: normalizedIsin
         }
       };
+      
+      // N'envoyer le code que s'il est fourni
+      if (formData.code && formData.code.trim()) {
+        payload.code = formData.code;
+        payload.donnees_supplementaires.Code = formData.code;
+      }
 
       const url = modalMode === 'edit' 
         ? `${API_URL}/api/signaletique/${selectedItem.id}/`
@@ -277,7 +275,19 @@ function SignaletiqueList() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Erreur lors de la sauvegarde');
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Extraire le message d'erreur de l'API
+        let errorMessage = 'Erreur lors de la sauvegarde';
+        if (errorData.isin && Array.isArray(errorData.isin)) {
+          errorMessage = errorData.isin[0];
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+        throw new Error(errorMessage);
+      }
       
       const result = await response.json();
       
@@ -301,8 +311,7 @@ function SignaletiqueList() {
     const typeInvest = item.donnees_supplementaires?.['Type d\'instr'] || '';
     const classeActif = item.donnees_supplementaires?.['Classe d\'actifs'] || '';
     
-    const matchesSearch = nomLong.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.code?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = nomLong.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = !filterType || typeInvest === filterType;
     const matchesClass = !filterClass || classeActif === filterClass;
     
@@ -327,25 +336,21 @@ function SignaletiqueList() {
       </div>
 
       <header className="App-header">
-        <Link to="/admin" className="btn btn-secondary back-button">
+        <Link to="/signaletique" className="btn btn-secondary back-button">
           {t('common.back')}
         </Link>
         
         <h1>{t('signaletique.title')}</h1>
         <p>{t('signaletique.subtitle')}</p>
 
-        <div className="button-container">
-          <button className="btn btn-danger" onClick={handleDeleteAll}>
-            {t('signaletique.deleteAll')}
-          </button>
-        </div>
+
 
         <div className="filters-section">
           <div className="search-filter">
             <input
               type="text"
               className="search-input"
-              placeholder="🔍 Rechercher par nom ou code..."
+              placeholder="🔍 Rechercher par nom..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -421,7 +426,6 @@ function SignaletiqueList() {
                         onClick={() => setSelectedItem(item)}
                       >
                         <div className="item-header">
-                          <span className="item-code">{item.code}</span>
                           <div className="item-badges">
                             <span className="badge badge-type">{typeInvest}</span>
                             <span className="badge badge-class">{classeActif}</span>
@@ -446,13 +450,6 @@ function SignaletiqueList() {
                           title="Modifier"
                         >
                           ✏️
-                        </button>
-                        <button 
-                          className="btn-small btn-danger"
-                          onClick={() => handleDelete(selectedItem.id)}
-                          title="Supprimer"
-                        >
-                          🗑️
                         </button>
                       </div>
                     </div>
@@ -547,18 +544,6 @@ function SignaletiqueList() {
               <form onSubmit={handleSubmit} className="modal-form">
                 <div className="form-grid">
                   <div className="form-group">
-                    <label>Code *</label>
-                    <input
-                      type="text"
-                      value={formData.code}
-                      onChange={(e) => setFormData({...formData, code: e.target.value})}
-                      required
-                      disabled={modalMode === 'edit'}
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
                     <label>Nom *</label>
                     <input
                       type="text"
@@ -570,13 +555,21 @@ function SignaletiqueList() {
                   </div>
 
                   <div className="form-group">
-                    <label>ISIN</label>
+                    <label>ISIN {formData.Isin && `(${formData.Isin.length} caractères)`}</label>
                     <input
                       type="text"
                       value={formData.Isin}
-                      onChange={(e) => setFormData({...formData, Isin: e.target.value})}
+                      onChange={(e) => setFormData({...formData, Isin: e.target.value.toUpperCase().trim()})}
+                      maxLength="12"
+                      placeholder="Ex: IE00BM67HK77"
                       className="form-input"
+                      style={formData.Isin && formData.Isin.length !== 12 ? {borderColor: 'orange'} : {}}
                     />
+                    {formData.Isin && formData.Isin.length !== 12 && (
+                      <small style={{color: 'orange', fontSize: '12px'}}>
+                        ⚠️ L'ISIN doit avoir exactement 12 caractères
+                      </small>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -602,10 +595,9 @@ function SignaletiqueList() {
                       className="form-input"
                     >
                       <option value="">Sélectionner...</option>
-                      <option value="Actions">Actions</option>
-                      <option value="Obligations">Obligations</option>
-                      <option value="Monétaire">Monétaire</option>
-                      <option value="Mixte">Mixte</option>
+                      {categories.map(category => (
+                        <option key={category.id} value={category.name}>{category.name}</option>
+                      ))}
                     </select>
                   </div>
 

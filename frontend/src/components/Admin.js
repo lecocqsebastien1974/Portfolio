@@ -30,15 +30,12 @@ function Admin() {
         <p>{t('admin.subtitle')}</p>
         
         <div className="button-container">
-          <Link to="/admin/import" className="btn btn-primary">
+          <Link to="/signaletique/import" className="btn btn-primary">
             {t('admin.importData')}
           </Link>
-          <Link to="/admin/signaletique" className="btn btn-success">
+          <Link to="/signaletique/data" className="btn btn-success">
             📊 {t('admin.viewData')}
           </Link>
-          <button className="btn btn-secondary">
-            {t('admin.manageUsers')}
-          </button>
         </div>
       </header>
     </div>

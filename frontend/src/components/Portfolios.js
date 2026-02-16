@@ -58,6 +58,10 @@ function Portfolios() {
       if (response.ok && data.success) {
         let message = `✅ Import réussi !\n📊 ${data.details.succes} transaction(s) importée(s)`;
         
+        if (data.details.doublons > 0) {
+          message += `\n⏭️ ${data.details.doublons} doublon(s) ignoré(s) (transactions déjà importées)`;
+        }
+        
         if (data.details.erreurs > 0) {
           message += `\n⚠️ ${data.details.erreurs} erreur(s)`;
         }

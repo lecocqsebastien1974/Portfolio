@@ -37,7 +37,10 @@ function ImportData() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setMessage(`✅ ${t('import.messages.success').replace('{fileName}', file.name)}\n📊 ${data.details.succes} ligne(s) importée(s) avec succès${data.details.erreurs > 0 ? `\n⚠️ ${data.details.erreurs} erreur(s)` : ''}`);
+        const successMsg = `✅ ${t('import.messages.success').replace('{fileName}', file.name)}\n📊 ${data.details.succes} ligne(s) importée(s) avec succès`;
+        const ignoredMsg = data.details.ignores > 0 ? `\n⏭️ ${data.details.ignores} titre(s) ignoré(s) (déjà existants)` : '';
+        const errorMsg = data.details.erreurs > 0 ? `\n⚠️ ${data.details.erreurs} erreur(s)` : '';
+        setMessage(successMsg + ignoredMsg + errorMsg);
         setFile(null);
         
         // Réinitialiser l'input file
@@ -91,7 +94,7 @@ function ImportData() {
   return (
     <div className="App">
       <header className="App-header">
-        <Link to="/admin" className="btn btn-secondary back-button">
+        <Link to="/signaletique" className="btn btn-secondary back-button">
           {t('common.back')}
         </Link>
         

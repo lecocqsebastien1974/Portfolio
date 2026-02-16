@@ -1,5 +1,30 @@
 from django.db import models
 
+
+class AssetCategory(models.Model):
+    """Catégories d'actifs pour la signalétique"""
+    name = models.CharField(max_length=200, unique=True, verbose_name="Nom")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
+    color = models.CharField(max_length=7, blank=True, null=True, verbose_name="Couleur (hex)")
+    ordre = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Catégorie d'actif"
+        verbose_name_plural = "Catégories d'actifs"
+        ordering = ['ordre', 'name']
+
+    def save(self, *args, **kwargs):
+        """Normaliser le nom en capitalisant la première lettre"""
+        if self.name:
+            self.name = self.name.strip().capitalize()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Signaletique(models.Model):
     """Modèle pour stocker les données de signalétique titre"""
     
@@ -8,7 +33,17 @@ class Signaletique(models.Model):
     isin = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="ISIN")
     titre = models.CharField(max_length=500, verbose_name="Titre")
     description = models.TextField(blank=True, null=True, verbose_name="Description")
-    categorie = models.CharField(max_length=200, blank=True, null=True, verbose_name="Catégorie")
+    # Garder l'ancien champ texte pour compatibilité
+    categorie_text = models.CharField(max_length=200, blank=True, null=True, verbose_name="Catégorie (texte)")
+    # Nouveau champ ForeignKey vers AssetCategory
+    categorie = models.ForeignKey(
+        AssetCategory,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='signaletiques',
+        verbose_name="Catégorie"
+    )
     statut = models.CharField(max_length=100, blank=True, null=True, verbose_name="Statut")
     
     # Métadonnées
