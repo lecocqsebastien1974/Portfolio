@@ -815,6 +815,62 @@ function ObligationsDetailModal({ positions, onClose, formatNumber, formatCurren
   const sectorTotals = calculateRepartition(positions, sectorFields);
   const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
 
+  // Calcul du Time to Maturity
+  const calculateTimeToMaturity = (position) => {
+    const ds = position.donnees_supplementaires || {};
+    const dateFin = ds['Date de fin'] || ds['date de fin'] || ds['Date De Fin'];
+    if (!dateFin) return null;
+
+    try {
+      const endDate = new Date(dateFin);
+      const today = new Date();
+      if (isNaN(endDate.getTime())) return null;
+
+      const diffTime = endDate - today;
+      const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+      return diffYears > 0 ? diffYears : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Calcul du TTM moyen pondéré
+  let totalTTMWeighted = 0;
+  let totalWeightWithTTM = 0;
+  const positionsWithTTM = [];
+
+  positions.forEach(pos => {
+    const ttm = calculateTimeToMaturity(pos);
+    const weight = totalValeur > 0 ? (pos.valeur || 0) / totalValeur : 0;
+    
+    if (ttm !== null) {
+      totalTTMWeighted += ttm * weight;
+      totalWeightWithTTM += weight;
+      positionsWithTTM.push({ ...pos, ttm, weight: weight * 100 });
+    } else {
+      positionsWithTTM.push({ ...pos, ttm: null, weight: weight * 100 });
+    }
+  });
+
+  const averageTTM = totalWeightWithTTM > 0 ? totalTTMWeighted / totalWeightWithTTM : 0;
+
+  // Distribution par tranches de maturité
+  const ttmRanges = [
+    { label: '< 1 an', min: 0, max: 1 },
+    { label: '1-3 ans', min: 1, max: 3 },
+    { label: '3-5 ans', min: 3, max: 5 },
+    { label: '5-7 ans', min: 5, max: 7 },
+    { label: '7-10 ans', min: 7, max: 10 },
+    { label: '> 10 ans', min: 10, max: Infinity }
+  ];
+
+  const ttmDistribution = ttmRanges.map(range => {
+    const rangeWeight = positionsWithTTM
+      .filter(pos => pos.ttm !== null && pos.ttm >= range.min && pos.ttm < range.max)
+      .reduce((sum, pos) => sum + pos.weight, 0);
+    return { label: range.label, weight: rangeWeight };
+  });
+
   return (
     <div style={{
       position: 'fixed',
@@ -945,6 +1001,59 @@ function ObligationsDetailModal({ positions, onClose, formatNumber, formatCurren
           </div>
         </div>
 
+        {/* Time to Maturity */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#9b59b6', marginBottom: '15px', fontSize: '18px' }}>
+            ⏱️ Time to Maturity
+          </h3>
+          <div style={{
+            backgroundColor: '#34495e',
+            padding: '20px',
+            borderRadius: '10px',
+            marginBottom: '15px',
+            textAlign: 'center',
+            border: '2px solid #9b59b6'
+          }}>
+            <div style={{ fontSize: '14px', color: '#bdc3c7', marginBottom: '8px' }}>
+              Maturité Moyenne Pondérée
+            </div>
+            <div style={{ fontSize: '28px', color: '#9b59b6', fontWeight: 'bold' }}>
+              {averageTTM > 0 ? formatNumber(averageTTM, 2) : 'N/A'} {averageTTM > 0 && 'ans'}
+            </div>
+            {totalWeightWithTTM < 1 && totalWeightWithTTM > 0 && (
+              <div style={{ fontSize: '12px', color: '#e67e22', marginTop: '8px' }}>
+                ⚠️ {formatNumber((1 - totalWeightWithTTM) * 100, 0)}% des positions sans date de fin
+              </div>
+            )}
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: '10px'
+          }}>
+            {ttmDistribution.map((item, idx) => (
+              <div
+                key={`ttm-${idx}`}
+                style={{
+                  backgroundColor: item.weight > 0 ? '#34495e' : '#2c3e50',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: `3px solid ${item.weight > 0 ? '#9b59b6' : '#34495e'}`,
+                  opacity: item.weight > 0 ? 1 : 0.5
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize: '16px', color: item.weight > 0 ? 'white' : '#7f8c8d', fontWeight: 'bold' }}>
+                  {formatNumber(item.weight, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Détail par position */}
         <div style={{ marginTop: '30px' }}>
           <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
@@ -963,13 +1072,22 @@ function ObligationsDetailModal({ positions, onClose, formatNumber, formatCurren
                   <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
                     Poids
                   </th>
+                  <th style={{ padding: '10px', textAlign: 'center', color: '#bdc3c7', fontWeight: '600' }}>
+                    Date de fin
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    TTM (ans)
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {positions
+                {positionsWithTTM
                   .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
                   .map((pos, i) => {
-                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    const ds = pos.donnees_supplementaires || {};
+                    const dateFin = ds['Date de fin'] || ds['date de fin'] || ds['Date De Fin'];
+                    const dateFinFormatted = dateFin ? new Date(dateFin).toLocaleDateString('fr-FR') : '-';
+                    
                     return (
                       <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
                         <td style={{ padding: '10px', color: 'white' }}>
@@ -979,7 +1097,13 @@ function ObligationsDetailModal({ positions, onClose, formatNumber, formatCurren
                           {formatCurrency(pos.valeur, pos.devise)}
                         </td>
                         <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
-                          {formatNumber(poids, 1)}%
+                          {formatNumber(pos.weight, 1)}%
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '12px', color: '#bdc3c7' }}>
+                          {dateFinFormatted}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: pos.ttm !== null ? '#9b59b6' : '#7f8c8d', fontWeight: pos.ttm !== null ? 'bold' : 'normal' }}>
+                          {pos.ttm !== null ? formatNumber(pos.ttm, 2) : '-'}
                         </td>
                       </tr>
                     );
