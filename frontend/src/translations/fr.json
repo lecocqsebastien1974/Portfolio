@@ -18,7 +18,8 @@
     "title": "Portfolio",
     "adminButton": "� Signalétique",
     "simulationButton": "🎯 Creer un portefeuille cible",
-    "portfoliosButton": "💼 Construction de portefeuilles"
+    "portfoliosButton": "💼 Construction de portefeuilles",
+    "analysisButton": "📊 Analyser mes portefeuilles"
   },
   "simulation": {
     "title": "Simulation",
@@ -74,6 +75,24 @@
     "sectorTitle": "Repartition sectorielle",
     "ratioLabel": "Ratio",
     "titleLabel": "Titre"
+  },
+  "portfolioAnalysis": {
+    "title": "Analyse de Portefeuilles",
+    "subtitle": "Analysez vos portefeuilles réels",
+    "selectPortfolio": "Sélectionnez un portefeuille à analyser",
+    "loading": "Chargement...",
+    "errorLoading": "Erreur lors du chargement des portefeuilles",
+    "errorAnalyzing": "Erreur lors de l'analyse du portefeuille",
+    "noPortfolios": "Aucun portefeuille disponible. Créez-en un d'abord!",
+    "analysisTitle": "Analyse du portefeuille",
+    "totalValue": "Valeur totale",
+    "activePositions": "Positions actives",
+    "transactions": "Transactions",
+    "positions": "Détail des positions",
+    "asset": "Actif",
+    "quantity": "Quantité",
+    "value": "Valeur",
+    "percentage": "% du portefeuille"
   },
   "admin": {
     "title": "Administration",

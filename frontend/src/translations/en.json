@@ -18,7 +18,8 @@
     "title": "Portfolio",
     "adminButton": "� Signaletique",
     "simulationButton": "🎯 Create a target portfolio",
-    "portfoliosButton": "💼 Portfolio Construction"
+    "portfoliosButton": "💼 Portfolio Construction",
+    "analysisButton": "📊 Analyze my portfolios"
   },
   "simulation": {
     "title": "Simulation",
@@ -74,6 +75,24 @@
     "sectorTitle": "Sector allocation",
     "ratioLabel": "Ratio",
     "titleLabel": "Title"
+  },
+  "portfolioAnalysis": {
+    "title": "Portfolio Analysis",
+    "subtitle": "Analyze your real portfolios",
+    "selectPortfolio": "Select a portfolio to analyze",
+    "loading": "Loading...",
+    "errorLoading": "Error loading portfolios",
+    "errorAnalyzing": "Error analyzing portfolio",
+    "noPortfolios": "No portfolios available. Create one first!",
+    "analysisTitle": "Portfolio analysis",
+    "totalValue": "Total value",
+    "activePositions": "Active positions",
+    "transactions": "Transactions",
+    "positions": "Position details",
+    "asset": "Asset",
+    "quantity": "Quantity",
+    "value": "Value",
+    "percentage": "% of portfolio"
   },
   "admin": {
     "title": "Administration",

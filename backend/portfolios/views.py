@@ -12,7 +12,7 @@ import os
 from datetime import date, datetime
 from decimal import Decimal
 from django.conf import settings
-from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction
+from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction, AssetCategory
 from .serializers import (
     SignaletiqueSerializer,
     ImportLogSerializer,
@@ -125,13 +125,24 @@ def import_signaletique(request):
                 
                 statut_data = row_data.get('Type d\'instr') or ""
                 
+                # Gérer la catégorie d'actifs
+                categorie_instance = None
+                if categorie and str(categorie).strip():
+                    categorie_name = str(categorie).strip().capitalize()
+                    # Chercher ou créer l'AssetCategory
+                    categorie_instance, created = AssetCategory.objects.get_or_create(
+                        name=categorie_name,
+                        defaults={'description': f'Catégorie créée automatiquement lors de l\'import'}
+                    )
+                
                 # Créer ou mettre à jour l'enregistrement
                 defaults = {
                     'code': str(code),
                     'isin': isin_value,
                     'titre': str(titre)[:500],
                     'description': str(description) if description else None,
-                    'categorie': str(categorie)[:200] if categorie else None,
+                    'categorie': categorie_instance,
+                    'categorie_text': str(categorie)[:200] if categorie else None,
                     'statut': str(statut_data)[:100] if statut_data else None,
                     'donnees_supplementaires': row_data
                 }
@@ -719,6 +730,25 @@ def delete_transaction(request, pk):
     )
 
 
+def is_obligation(categorie, type_instrument=''):
+    """
+    Détermine si un actif est une obligation.
+    Pour les obligations, le prix est en pourcentage (100 = 1).
+    """
+    categorie_lower = (categorie or '').lower()
+    type_lower = (type_instrument or '').lower()
+    return 'obligation' in categorie_lower or 'obligation' in type_lower
+
+
+def get_prix_reel(prix_unitaire, categorie, type_instrument=''):
+    """
+    Retourne le prix réel en tenant compte du fait que les obligations sont en pourcentage.
+    """
+    if is_obligation(categorie, type_instrument):
+        return prix_unitaire / Decimal('100')
+    return prix_unitaire
+
+
 @api_view(['GET'])
 def portfolio_fifo_analysis(request, pk):
     """Analyse FIFO d'un portefeuille : positions actuelles et P&L réalisé"""
@@ -731,7 +761,9 @@ def portfolio_fifo_analysis(request, pk):
         )
     
     # Récupérer toutes les transactions triées par date
-    transactions = Transaction.objects.filter(portfolio=portfolio).order_by('date', 'id')
+    transactions = Transaction.objects.filter(portfolio=portfolio).select_related(
+        'signaletique', 'signaletique__categorie'
+    ).order_by('date', 'id')
     
     # Structure pour stocker les lots d'achat (FIFO)
     # positions[isin] = [(date, quantite, prix_unitaire), ...]
@@ -746,12 +778,26 @@ def portfolio_fifo_analysis(request, pk):
     for transaction in transactions:
         isin = transaction.signaletique.isin or transaction.signaletique.code
         titre = transaction.signaletique.titre
+        sig = transaction.signaletique
+        if sig.categorie:
+            categorie = sig.categorie.name
+        elif sig.categorie_text:
+            categorie = sig.categorie_text
+        else:
+            categorie = 'Non classé'
+        
+        # Extraire le type d'instrument depuis donnees_supplementaires
+        type_instrument = ''
+        if sig.donnees_supplementaires and "Type d'instr" in sig.donnees_supplementaires:
+            type_instrument = sig.donnees_supplementaires["Type d'instr"] or ''
         
         if transaction.type_operation == 'ACHAT':
             # Ajouter un lot d'achat
             if isin not in positions:
                 positions[isin] = {
                     'titre': titre,
+                    'categorie': categorie,
+                    'type_instrument': type_instrument,
                     'lots': [],
                     'quantite_totale': Decimal('0')
                 }
@@ -764,14 +810,20 @@ def portfolio_fifo_analysis(request, pk):
             })
             positions[isin]['quantite_totale'] += transaction.quantite
             
+            # Calculer le montant (pour obligations: prix en %, donc diviser par 100)
+            prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+            montant = transaction.quantite * prix_reel
+            
             transaction_details.append({
                 'id': transaction.id,
                 'date': transaction.date,
                 'type': 'ACHAT',
                 'titre': titre,
+                'categorie': categorie,
+                'type_instrument': type_instrument,
                 'quantite': float(transaction.quantite),
                 'prix_unitaire': float(transaction.prix_unitaire),
-                'montant': float(transaction.quantite * transaction.prix_unitaire),
+                'montant': float(montant),
                 'devise': transaction.devise
             })
             
@@ -779,14 +831,18 @@ def portfolio_fifo_analysis(request, pk):
             # Consommer les lots d'achat en FIFO
             if isin not in positions or positions[isin]['quantite_totale'] < transaction.quantite:
                 # Vente à découvert ou erreur
+                prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+                montant = transaction.quantite * prix_reel
+                
                 transaction_details.append({
                     'id': transaction.id,
                     'date': transaction.date,
                     'type': 'VENTE',
                     'titre': titre,
+                    'categorie': categorie,
                     'quantite': float(transaction.quantite),
                     'prix_unitaire': float(transaction.prix_unitaire),
-                    'montant': float(transaction.quantite * transaction.prix_unitaire),
+                    'montant': float(montant),
                     'devise': transaction.devise,
                     'erreur': 'Vente sans achat correspondant'
                 })
@@ -802,7 +858,10 @@ def portfolio_fifo_analysis(request, pk):
                 if lot['quantite'] <= quantite_a_vendre:
                     # Consommer tout le lot
                     quantite_vendue = lot['quantite']
-                    pnl_lot = quantite_vendue * (transaction.prix_unitaire - lot['prix_unitaire'])
+                    # Pour obligations: prix en %, donc calculer avec prix réels
+                    prix_vente_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+                    prix_achat_reel = get_prix_reel(lot['prix_unitaire'], categorie, type_instrument)
+                    pnl_lot = quantite_vendue * (prix_vente_reel - prix_achat_reel)
                     pnl_transaction += pnl_lot
                     
                     lots_consommes.append({
@@ -819,7 +878,10 @@ def portfolio_fifo_analysis(request, pk):
                 else:
                     # Consommer partiellement le lot
                     quantite_vendue = quantite_a_vendre
-                    pnl_lot = quantite_vendue * (transaction.prix_unitaire - lot['prix_unitaire'])
+                    # Pour obligations: prix en %, donc calculer avec prix réels
+                    prix_vente_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+                    prix_achat_reel = get_prix_reel(lot['prix_unitaire'], categorie, type_instrument)
+                    pnl_lot = quantite_vendue * (prix_vente_reel - prix_achat_reel)
                     pnl_transaction += pnl_lot
                     
                     lots_consommes.append({
@@ -837,6 +899,8 @@ def portfolio_fifo_analysis(request, pk):
             if isin not in realized_pnl:
                 realized_pnl[isin] = {
                     'titre': titre,
+                    'categorie': categorie,
+                    'type_instrument': type_instrument,
                     'pnl_total': Decimal('0'),
                     'ventes': []
                 }
@@ -850,14 +914,20 @@ def portfolio_fifo_analysis(request, pk):
                 'lots_consommes': lots_consommes
             })
             
+            # Calculer le montant (pour obligations: prix en %, donc diviser par 100)
+            prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+            montant = transaction.quantite * prix_reel
+            
             transaction_details.append({
                 'id': transaction.id,
                 'date': transaction.date,
                 'type': 'VENTE',
                 'titre': titre,
+                'categorie': categorie,
+                'type_instrument': type_instrument,
                 'quantite': float(transaction.quantite),
                 'prix_unitaire': float(transaction.prix_unitaire),
-                'montant': float(transaction.quantite * transaction.prix_unitaire),
+                'montant': float(montant),
                 'devise': transaction.devise,
                 'pnl': float(pnl_transaction),
                 'lots_consommes': lots_consommes
@@ -868,12 +938,22 @@ def portfolio_fifo_analysis(request, pk):
     for isin, data in positions.items():
         if data['quantite_totale'] > 0:
             # Calculer le prix moyen pondéré des lots restants
-            valeur_totale = sum(lot['quantite'] * lot['prix_unitaire'] for lot in data['lots'])
+            # Pour obligations: utiliser prix réel (prix/100)
+            categorie = data.get('categorie', 'Non classé')
+            type_instrument = data.get('type_instrument', '')
+            
+            valeur_totale = Decimal('0')
+            for lot in data['lots']:
+                prix_reel = get_prix_reel(lot['prix_unitaire'], categorie, type_instrument)
+                valeur_totale += lot['quantite'] * prix_reel
+            
             prix_moyen = valeur_totale / data['quantite_totale'] if data['quantite_totale'] > 0 else Decimal('0')
             
             positions_actuelles.append({
                 'isin': isin,
                 'titre': data['titre'],
+                'categorie': data.get('categorie', 'Non classé'),
+                'type_instrument': data.get('type_instrument', ''),
                 'quantite': float(data['quantite_totale']),
                 'prix_moyen': float(prix_moyen),
                 'valeur': float(valeur_totale),
@@ -896,6 +976,8 @@ def portfolio_fifo_analysis(request, pk):
         {
             'isin': isin,
             'titre': data['titre'],
+            'categorie': data.get('categorie', 'Non classé'),
+            'type_instrument': data.get('type_instrument', ''),
             'pnl_total': float(data['pnl_total']),
             'ventes': data['ventes']
         }

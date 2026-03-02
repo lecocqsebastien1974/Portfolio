@@ -51,6 +51,9 @@ function Home() {
           <Link to="/portfolios" className="btn btn-home-portfolios">
             {t('home.portfoliosButton')}
           </Link>
+          <Link to="/portfolio-analysis" className="btn btn-home-analysis">
+            {t('home.analysisButton')}
+          </Link>
         </div>
 
         {user && user.is_superuser && (

@@ -1141,6 +1141,16 @@ button:disabled {
   background: linear-gradient(135deg, #38f9d7 0%, #43e97b 100%);
 }
 
+/* Analyse des portefeuilles */
+.btn-home-analysis {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-home-analysis:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
 .portfolios-list {
   width: 100%;
   max-width: 1200px;

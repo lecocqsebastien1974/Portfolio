@@ -9,6 +9,7 @@ import ImportData from './components/ImportData';
 import SignaletiqueList from './components/SignaletiqueList';
 import Simulation from './components/Simulation';
 import Analysis from './components/Analysis';
+import PortfolioAnalysis from './components/PortfolioAnalysis';
 import Portfolios from './components/Portfolios';
 import TransactionsList from './components/TransactionsList';
 import Login from './components/Login';
@@ -27,6 +28,7 @@ function App() {
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
               <Route path="/admin-panel" element={<SuperUserRoute><AdminPanel /></SuperUserRoute>} />
               <Route path="/portfolios" element={<ProtectedRoute><Portfolios /></ProtectedRoute>} />
+              <Route path="/portfolio-analysis" element={<ProtectedRoute><PortfolioAnalysis /></ProtectedRoute>} />
               <Route path="/portfolios/:portfolioId" element={<ProtectedRoute><TransactionsList /></ProtectedRoute>} />
               <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />
               <Route path="/analysis/:id" element={<ProtectedRoute><Analysis /></ProtectedRoute>} />
