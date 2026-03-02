@@ -26,6 +26,22 @@ def health_check(request):
     return Response({'status': 'ok', 'message': 'Portfolio API is running'})
 
 
+@api_view(['GET'])
+def list_categories(request):
+    """Liste toutes les catégories d'actifs disponibles"""
+    categories = AssetCategory.objects.all().order_by('ordre', 'name')
+    return Response([
+        {
+            'id': cat.id,
+            'name': cat.name,
+            'description': cat.description,
+            'color': cat.color,
+            'ordre': cat.ordre
+        }
+        for cat in categories
+    ])
+
+
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def import_signaletique(request):
@@ -798,6 +814,8 @@ def portfolio_fifo_analysis(request, pk):
                     'titre': titre,
                     'categorie': categorie,
                     'type_instrument': type_instrument,
+                    'signaletique_id': sig.id,
+                    'donnees_supplementaires': sig.donnees_supplementaires or {},
                     'lots': [],
                     'quantite_totale': Decimal('0')
                 }
@@ -954,6 +972,8 @@ def portfolio_fifo_analysis(request, pk):
                 'titre': data['titre'],
                 'categorie': data.get('categorie', 'Non classé'),
                 'type_instrument': data.get('type_instrument', ''),
+                'signaletique_id': data.get('signaletique_id'),
+                'donnees_supplementaires': data.get('donnees_supplementaires', {}),
                 'quantite': float(data['quantite_totale']),
                 'prix_moyen': float(prix_moyen),
                 'valeur': float(valeur_totale),

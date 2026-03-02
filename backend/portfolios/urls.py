@@ -22,6 +22,7 @@ urlpatterns = [
     
     # Routes existantes
     path('health/', views.health_check, name='health_check'),
+    path('categories/', views.list_categories, name='list_categories'),
     path('import/signaletique/', views.import_signaletique, name='import_signaletique'),
     path('signaletique/', views.list_signaletique, name='list_signaletique'),
     path('signaletique/export/', views.export_signaletique_csv, name='export_signaletique_csv'),

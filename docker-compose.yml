@@ -62,13 +62,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8001}
+      # Ne pas définir REACT_APP_API_URL pour utiliser window.location.origin
     container_name: portfolio_frontend
     ports:
       - "3001:3001"  # Port 3001 pour éviter conflit avec investment_game (3000)
-    environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8001}
     depends_on:
       - portfolio_backend
     networks:

@@ -21,6 +21,7 @@ function SignaletiqueList() {
     Isin: '',
     'Type d\'instr': '',
     'Classe d\'actifs': '',
+    'categorie_id': null,
     'Cap/Dis': '',
     Devise: '',
     TER: '',
@@ -100,13 +101,13 @@ function SignaletiqueList() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/admin/categories/', {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_URL}/api/categories/`);
       if (response.ok) {
         const categoriesData = await response.json();
         const categoriesList = Array.isArray(categoriesData) ? categoriesData : (categoriesData.results || []);
         setCategories(categoriesList);
+      } else {
+        console.error('Erreur lors du chargement des catégories:', response.status);
       }
     } catch (err) {
       console.error('Erreur lors du chargement des catégories:', err);
@@ -159,6 +160,7 @@ function SignaletiqueList() {
       Isin: '',
       'Type d\'instr': '',
       'Classe d\'actifs': '',
+      'categorie_id': null,
       'Cap/Dis': '',
       Devise: '',
       TER: '',
@@ -171,12 +173,17 @@ function SignaletiqueList() {
     if (!selectedItem) return;
     setModalMode('edit');
     const ds = selectedItem.donnees_supplementaires || {};
+    
+    // Charger l'ID de catégorie depuis le modèle (peut être null)
+    const categorieId = selectedItem.categorie?.id || selectedItem.categorie || null;
+    
     setFormData({
       code: selectedItem.code,
       Nom: ds['Nom'] || '',
       Isin: ds['Isin'] || '',
       'Type d\'instr': ds['Type d\'instr'] || '',
       'Classe d\'actifs': ds['Classe d\'actifs'] || '',
+      'categorie_id': categorieId,
       'Cap/Dis': ds['Cap/Dis'] || '',
       Devise: ds['Devise'] || '',
       TER: ds['TER'] || '',
@@ -247,7 +254,7 @@ function SignaletiqueList() {
       const payload = {
         titre: formData.Nom,
         isin: normalizedIsin || null,
-        categorie: formData['Classe d\'actifs'] || null,
+        categorie: formData.categorie_id || null,
         statut: formData['Type d\'instr'] || null,
         donnees_supplementaires: {
           ...formData,
@@ -588,15 +595,23 @@ function SignaletiqueList() {
                   </div>
 
                   <div className="form-group">
-                    <label>Classe d'actifs</label>
+                    <label>Classe d'actifs (catégorie)</label>
                     <select
-                      value={formData['Classe d\'actifs']}
-                      onChange={(e) => setFormData({...formData, 'Classe d\'actifs': e.target.value})}
+                      value={formData.categorie_id || ''}
+                      onChange={(e) => {
+                        const selectedId = e.target.value ? parseInt(e.target.value) : null;
+                        const selectedCategory = categories.find(cat => cat.id === selectedId);
+                        setFormData({
+                          ...formData, 
+                          'categorie_id': selectedId,
+                          'Classe d\'actifs': selectedCategory ? selectedCategory.name : ''
+                        });
+                      }}
                       className="form-input"
                     >
                       <option value="">Sélectionner...</option>
                       {categories.map(category => (
-                        <option key={category.id} value={category.name}>{category.name}</option>
+                        <option key={category.id} value={category.id}>{category.name}</option>
                       ))}
                     </select>
                   </div>

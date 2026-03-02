@@ -12,6 +12,11 @@ function PortfolioAnalysis() {
   const [loadingPortfolios, setLoadingPortfolios] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState('');
+  const [showActionsDetail, setShowActionsDetail] = useState(false);
+  const [showObligationsDetail, setShowObligationsDetail] = useState(false);
+  const [showImmobilierDetail, setShowImmobilierDetail] = useState(false);
+  const [showLongShortDetail, setShowLongShortDetail] = useState(false);
+  const [showMatieresDetail, setShowMatieresDetail] = useState(false);
 
   const apiBaseUrl = process.env.REACT_APP_API_URL || window.location.origin;
 
@@ -98,6 +103,49 @@ function PortfolioAnalysis() {
       groups[group].push(item);
       return groups;
     }, {});
+  };
+
+  const normalizeKey = (value) => {
+    return String(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  };
+
+  const parseNumber = (value) => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    const normalized = String(value)
+      .replace('%', '')
+      .replace(',', '.')
+      .trim();
+    const parsed = Number.parseFloat(normalized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const getValue = (ds, label) => {
+    if (!ds) return 0;
+    const keyMap = new Map(Object.keys(ds).map((key) => [normalizeKey(key), key]));
+    const matchedKey = keyMap.get(normalizeKey(label));
+    return parseNumber(matchedKey ? ds[matchedKey] : 0);
+  };
+
+  const calculateRepartition = (positions, fields) => {
+    const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+    if (totalValeur === 0) return [];
+
+    const result = fields.map((field) => {
+      const total = positions.reduce((sum, pos) => {
+        const poids = (pos.valeur || 0) / totalValeur;
+        const value = getValue(pos.donnees_supplementaires, field);
+        return sum + (poids * value * 100); // Multiplier par 100 car poids est en décimal
+      }, 0);
+      return { field, total };
+    });
+
+    return result.sort((a, b) => b.total - a.total);
   };
 
   return (
@@ -235,9 +283,91 @@ function PortfolioAnalysis() {
                               backgroundColor: '#1a252f', padding: '10px 14px',
                               borderRadius: '6px 6px 0 0', borderBottom: '2px solid #667eea'
                             }}>
-                              <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#667eea' }}>
-                                {categorie}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#667eea' }}>
+                                  {categorie}
+                                </span>
+                                {categorie.toLowerCase().includes('action') && (
+                                  <button
+                                    onClick={() => setShowActionsDetail(true)}
+                                    className="btn"
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: '12px',
+                                      background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    📊 Voir répartition géo/secteurs
+                                  </button>
+                                )}
+                                {categorie.toLowerCase().includes('obligation') && (
+                                  <button
+                                    onClick={() => setShowObligationsDetail(true)}
+                                    className="btn"
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: '12px',
+                                      background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    📊 Voir répartition géo/secteurs
+                                  </button>
+                                )}
+                                {categorie.toLowerCase().includes('immobilier') && (
+                                  <button
+                                    onClick={() => setShowImmobilierDetail(true)}
+                                    className="btn"
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: '12px',
+                                      background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    📊 Voir répartition géo/secteurs
+                                  </button>
+                                )}
+                                {categorie.toLowerCase().includes('long') && categorie.toLowerCase().includes('short') && (
+                                  <button
+                                    onClick={() => setShowLongShortDetail(true)}
+                                    className="btn"
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: '12px',
+                                      background: 'linear-gradient(135deg, #1abc9c 0%, #16a085 100%)',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    📊 Voir répartition géo/secteurs
+                                  </button>
+                                )}
+                                {(categorie.toLowerCase().includes('matière') || categorie.toLowerCase().includes('matiere')) && (
+                                  <button
+                                    onClick={() => setShowMatieresDetail(true)}
+                                    className="btn"
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: '12px',
+                                      background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    📊 Voir répartition géo/secteurs
+                                  </button>
+                                )}
+                              </div>
                               <span style={{ color: '#bdc3c7', fontSize: '13px' }}>
                                 {formatCurrency(valeurClasse)} &mdash; {pctClasse}% du portefeuille
                               </span>
@@ -407,7 +537,1119 @@ function PortfolioAnalysis() {
             ) : null}
           </div>
         )}
-      </header>
+
+        {/* Modal de détail pour les Actions */}
+        {showActionsDetail && analysis && (
+          <ActionsDetailModal
+            positions={analysis.positions_actuelles.filter(p => 
+              (p.categorie || '').toLowerCase().includes('action')
+            )}
+            onClose={() => setShowActionsDetail(false)}
+            formatNumber={formatNumber}
+            formatCurrency={formatCurrency}
+            calculateRepartition={calculateRepartition}
+            getValue={getValue}
+          />
+        )}        {showObligationsDetail && analysis && (
+          <ObligationsDetailModal
+            positions={analysis.positions_actuelles.filter(p =>
+              p.categorie && p.categorie.toLowerCase().includes('obligation')
+            )}
+            onClose={() => setShowObligationsDetail(false)}
+            formatNumber={formatNumber}
+            formatCurrency={formatCurrency}
+            calculateRepartition={calculateRepartition}
+            getValue={getValue}
+          />
+        )}
+        {showImmobilierDetail && analysis && (
+          <ImmobilierDetailModal
+            positions={analysis.positions_actuelles.filter(p =>
+              p.categorie && p.categorie.toLowerCase().includes('immobilier')
+            )}
+            onClose={() => setShowImmobilierDetail(false)}
+            formatNumber={formatNumber}
+            formatCurrency={formatCurrency}
+            calculateRepartition={calculateRepartition}
+            getValue={getValue}
+          />
+        )}
+        {showLongShortDetail && analysis && (
+          <LongShortDetailModal
+            positions={analysis.positions_actuelles.filter(p =>
+              p.categorie && p.categorie.toLowerCase().includes('long') && p.categorie.toLowerCase().includes('short')
+            )}
+            onClose={() => setShowLongShortDetail(false)}
+            formatNumber={formatNumber}
+            formatCurrency={formatCurrency}
+            calculateRepartition={calculateRepartition}
+            getValue={getValue}
+          />
+        )}
+        {showMatieresDetail && analysis && (
+          <MatieresDetailModal
+            positions={analysis.positions_actuelles.filter(p =>
+              p.categorie && (p.categorie.toLowerCase().includes('matière') || p.categorie.toLowerCase().includes('matiere'))
+            )}
+            onClose={() => setShowMatieresDetail(false)}
+            formatNumber={formatNumber}
+            formatCurrency={formatCurrency}
+            calculateRepartition={calculateRepartition}
+            getValue={getValue}
+          />
+        )}      </header>
+    </div>
+  );
+}
+
+function ActionsDetailModal({ positions, onClose, formatNumber, formatCurrency, calculateRepartition, getValue }) {
+  const geoFields = [
+    'USA', 'Japon', 'Grande Bretagne', 'Canada', 'Pays Emergeants Hors Chine et Japon',
+    'Australie', 'Suède', 'Suisse', 'Chine', 'Israel', 'Allemagne', 'Nouvelle Zelande',
+    'Pays-Bas', 'Irlande', 'Espagne', 'Italie', 'France', 'Autre Pays'
+  ];
+
+  const sectorFields = [
+    'Etats', 'Industrie', 'Finance', 'Consommation Cyclique', 'Technologie',
+    'Santé', 'Consommation Defensive', 'Communication', 'Immobilier',
+    'Matières Premières', 'Energie', 'Service Publiques', 'Services de consommation', 'Autre Secteur'
+  ];
+
+  const geoTotals = calculateRepartition(positions, geoFields);
+  const sectorTotals = calculateRepartition(positions, sectorFields);
+  
+  const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,  
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      overflow: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: '#2c3e50',
+        borderRadius: '12px',
+        padding: '30px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: '#e74c3c',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{ color: '#667eea', marginBottom: '10px' }}>📊 Répartition des Actions</h2>
+        <p style={{ color: '#bdc3c7', marginBottom: '25px' }}>
+          Valeur totale : {formatCurrency(totalValeur)} • {positions.length} position{positions.length > 1 ? 's' : ''}
+        </p>
+
+        {/* Répartition géographique */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#3498db', marginBottom: '15px', fontSize: '18px' }}>
+            🌍 Répartition Géographique
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {geoTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`geo-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3498db'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(geoTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Répartition sectorielle */}
+        <div>
+          <h3 style={{ color: '#e67e22', marginBottom: '15px', fontSize: '18px' }}>
+            🏭 Répartition Sectorielle
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {sectorTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`sector-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #e67e22'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(sectorTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Détail par position */}
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
+            📋 Détail par position
+          </h3>
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a252f' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a252f' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: '#bdc3c7', fontWeight: '600' }}>
+                    Titre
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Valeur
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Poids
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions
+                  .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
+                  .map((pos, i) => {
+                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    return (
+                      <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
+                        <td style={{ padding: '10px', color: 'white' }}>
+                          {pos.titre}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: 'white', fontWeight: 'bold' }}>
+                          {formatCurrency(pos.valeur, pos.devise)}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
+                          {formatNumber(poids, 1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ObligationsDetailModal({ positions, onClose, formatNumber, formatCurrency, calculateRepartition, getValue }) {
+  const geoFields = [
+    'USA', 'Japon', 'Grande Bretagne', 'Canada', 'Pays Emergeants Hors Chine et Japon',
+    'Australie', 'Suède', 'Suisse', 'Chine', 'Israel', 'Allemagne', 'Nouvelle Zelande',
+    'Pays-Bas', 'Irlande', 'Espagne', 'Italie', 'France', 'Autre Pays'
+  ];
+
+  const sectorFields = [
+    'Industrie', 'Finance', 'Consommation Cyclique', 'Technologie',
+    'Santé', 'Consommation Defensive', 'Communication', 'Immobilier',
+    'Matières Premières', 'Energie', 'Service Publiques', 'Services de consommation', 'Autre Secteur'
+  ];
+
+  const geoTotals = calculateRepartition(positions, geoFields);
+  const sectorTotals = calculateRepartition(positions, sectorFields);
+  const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      overflow: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: '#2c3e50',
+        borderRadius: '12px',
+        padding: '30px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: '#e74c3c',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{ color: '#e67e22', marginBottom: '10px' }}>📊 Répartition des Obligations</h2>
+        <p style={{ color: '#bdc3c7', marginBottom: '25px' }}>
+          Valeur totale : {formatCurrency(totalValeur)} • {positions.length} position{positions.length > 1 ? 's' : ''}
+        </p>
+
+        {/* Répartition géographique */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#3498db', marginBottom: '15px', fontSize: '18px' }}>
+            🌍 Répartition Géographique
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {geoTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`geo-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3498db'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(geoTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Répartition sectorielle */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#e67e22', marginBottom: '15px', fontSize: '18px' }}>
+            🏭 Répartition Sectorielle
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {sectorTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`sector-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #e67e22'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(sectorTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Détail par position */}
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
+            📋 Détail par position
+          </h3>
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a252f' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a252f' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: '#bdc3c7', fontWeight: '600' }}>
+                    Titre
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Valeur
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Poids
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions
+                  .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
+                  .map((pos, i) => {
+                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    return (
+                      <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
+                        <td style={{ padding: '10px', color: 'white' }}>
+                          {pos.titre}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: 'white', fontWeight: 'bold' }}>
+                          {formatCurrency(pos.valeur, pos.devise)}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
+                          {formatNumber(poids, 1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '25px', textAlign: 'center' }}>
+          <button
+            onClick={onClose}
+            className="btn"
+            style={{
+              padding: '10px 30px',
+              fontSize: '14px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImmobilierDetailModal({ positions, onClose, formatNumber, formatCurrency, calculateRepartition, getValue }) {
+  const geoFields = [
+    'USA', 'Japon', 'Grande Bretagne', 'Canada', 'Pays Emergeants Hors Chine et Japon',
+    'Australie', 'Suède', 'Suisse', 'Chine', 'Israel', 'Allemagne', 'Nouvelle Zelande',
+    'Pays-Bas', 'Irlande', 'Espagne', 'Italie', 'France', 'Autre Pays'
+  ];
+
+  const sectorFields = [
+    'Etats', 'Industrie', 'Finance', 'Consommation Cyclique', 'Technologie',
+    'Santé', 'Consommation Defensive', 'Communication', 'Immobilier',
+    'Matières Premières', 'Energie', 'Service Publiques', 'Services de consommation', 'Autre Secteur'
+  ];
+
+  const geoTotals = calculateRepartition(positions, geoFields);
+  const sectorTotals = calculateRepartition(positions, sectorFields);
+  const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      overflow: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: '#2c3e50',
+        borderRadius: '12px',
+        padding: '30px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: '#e74c3c',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{ color: '#9b59b6', marginBottom: '10px' }}>📊 Répartition Immobilier</h2>
+        <p style={{ color: '#bdc3c7', marginBottom: '25px' }}>
+          Valeur totale : {formatCurrency(totalValeur)} • {positions.length} position{positions.length > 1 ? 's' : ''}
+        </p>
+
+        {/* Répartition géographique */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#3498db', marginBottom: '15px', fontSize: '18px' }}>
+            🌍 Répartition Géographique
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {geoTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`geo-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3498db'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(geoTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Répartition sectorielle */}
+        <div>
+          <h3 style={{ color: '#e67e22', marginBottom: '15px', fontSize: '18px' }}>
+            🏭 Répartition Sectorielle
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {sectorTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`sector-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #e67e22'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(sectorTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Détail par position */}
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
+            📋 Détail par position
+          </h3>
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a252f' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a252f' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: '#bdc3c7', fontWeight: '600' }}>
+                    Titre
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Valeur
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Poids
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions
+                  .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
+                  .map((pos, i) => {
+                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    return (
+                      <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
+                        <td style={{ padding: '10px', color: 'white' }}>
+                          {pos.titre}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: 'white', fontWeight: 'bold' }}>
+                          {formatCurrency(pos.valeur, pos.devise)}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
+                          {formatNumber(poids, 1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '25px', textAlign: 'center' }}>
+          <button
+            onClick={onClose}
+            className="btn"
+            style={{
+              padding: '10px 30px',
+              fontSize: '14px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LongShortDetailModal({ positions, onClose, formatNumber, formatCurrency, calculateRepartition, getValue }) {
+  const geoFields = [
+    'USA', 'Japon', 'Grande Bretagne', 'Canada', 'Pays Emergeants Hors Chine et Japon',
+    'Australie', 'Suède', 'Suisse', 'Chine', 'Israel', 'Allemagne', 'Nouvelle Zelande',
+    'Pays-Bas', 'Irlande', 'Espagne', 'Italie', 'France', 'Autre Pays'
+  ];
+
+  const sectorFields = [
+    'Etats', 'Industrie', 'Finance', 'Consommation Cyclique', 'Technologie',
+    'Santé', 'Consommation Defensive', 'Communication', 'Immobilier',
+    'Matières Premières', 'Energie', 'Service Publiques', 'Services de consommation', 'Autre Secteur'
+  ];
+
+  const geoTotals = calculateRepartition(positions, geoFields);
+  const sectorTotals = calculateRepartition(positions, sectorFields);
+  const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      overflow: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: '#2c3e50',
+        borderRadius: '12px',
+        padding: '30px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: '#e74c3c',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{ color: '#1abc9c', marginBottom: '10px' }}>📊 Répartition Long/Short</h2>
+        <p style={{ color: '#bdc3c7', marginBottom: '25px' }}>
+          Valeur totale : {formatCurrency(totalValeur)} • {positions.length} position{positions.length > 1 ? 's' : ''}
+        </p>
+
+        {/* Répartition géographique */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#3498db', marginBottom: '15px', fontSize: '18px' }}>
+            🌍 Répartition Géographique
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {geoTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`geo-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3498db'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(geoTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Répartition sectorielle */}
+        <div>
+          <h3 style={{ color: '#e67e22', marginBottom: '15px', fontSize: '18px' }}>
+            🏭 Répartition Sectorielle
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {sectorTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`sector-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #e67e22'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(sectorTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Détail par position */}
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
+            📋 Détail par position
+          </h3>
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a252f' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a252f' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: '#bdc3c7', fontWeight: '600' }}>
+                    Titre
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Valeur
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Poids
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions
+                  .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
+                  .map((pos, i) => {
+                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    return (
+                      <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
+                        <td style={{ padding: '10px', color: 'white' }}>
+                          {pos.titre}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: 'white', fontWeight: 'bold' }}>
+                          {formatCurrency(pos.valeur, pos.devise)}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
+                          {formatNumber(poids, 1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '25px', textAlign: 'center' }}>
+          <button
+            onClick={onClose}
+            className="btn"
+            style={{
+              padding: '10px 30px',
+              fontSize: '14px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatieresDetailModal({ positions, onClose, formatNumber, formatCurrency, calculateRepartition, getValue }) {
+  const geoFields = [
+    'USA', 'Japon', 'Grande Bretagne', 'Canada', 'Pays Emergeants Hors Chine et Japon',
+    'Australie', 'Suède', 'Suisse', 'Chine', 'Israel', 'Allemagne', 'Nouvelle Zelande',
+    'Pays-Bas', 'Irlande', 'Espagne', 'Italie', 'France', 'Autre Pays'
+  ];
+
+  const sectorFields = [
+    'Etats', 'Industrie', 'Finance', 'Consommation Cyclique', 'Technologie',
+    'Santé', 'Consommation Defensive', 'Communication', 'Immobilier',
+    'Matières Premières', 'Energie', 'Service Publiques', 'Services de consommation', 'Autre Secteur'
+  ];
+
+  const geoTotals = calculateRepartition(positions, geoFields);
+  const sectorTotals = calculateRepartition(positions, sectorFields);
+  const totalValeur = positions.reduce((sum, pos) => sum + (pos.valeur || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      overflow: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: '#2c3e50',
+        borderRadius: '12px',
+        padding: '30px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: '#e74c3c',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{ color: '#f39c12', marginBottom: '10px' }}>📊 Répartition Matières Premières</h2>
+        <p style={{ color: '#bdc3c7', marginBottom: '25px' }}>
+          Valeur totale : {formatCurrency(totalValeur)} • {positions.length} position{positions.length > 1 ? 's' : ''}
+        </p>
+
+        {/* Répartition géographique */}
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ color: '#3498db', marginBottom: '15px', fontSize: '18px' }}>
+            🌍 Répartition Géographique
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {geoTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`geo-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #3498db'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(geoTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Répartition sectorielle */}
+        <div>
+          <h3 style={{ color: '#e67e22', marginBottom: '15px', fontSize: '18px' }}>
+            🏭 Répartition Sectorielle
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+            {sectorTotals.filter(item => item.total > 0.1).map((item) => (
+              <div
+                key={`sector-${item.field}`}
+                style={{
+                  backgroundColor: '#34495e',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #e67e22'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#bdc3c7', marginBottom: '4px' }}>
+                  {item.field}
+                </div>
+                <div style={{ fontSize: '16px', color: 'white', fontWeight: 'bold' }}>
+                  {formatNumber(item.total, 1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            textAlign: 'right',
+            padding: '10px',
+            color: '#bdc3c7',
+            fontSize: '14px'
+          }}>
+            Total: {formatNumber(sectorTotals.reduce((s, i) => s + i.total, 0), 1)}%
+          </div>
+        </div>
+
+        {/* Détail par position */}
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#2ecc71', marginBottom: '15px', fontSize: '18px' }}>
+            📋 Détail par position
+          </h3>
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a252f' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a252f' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: '#bdc3c7', fontWeight: '600' }}>
+                    Titre
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Valeur
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: '#bdc3c7', fontWeight: '600' }}>
+                    Poids
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions
+                  .sort((a, b) => (b.valeur || 0) - (a.valeur || 0))
+                  .map((pos, i) => {
+                    const poids = totalValeur > 0 ? ((pos.valeur || 0) / totalValeur * 100) : 0;
+                    return (
+                      <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
+                        <td style={{ padding: '10px', color: 'white' }}>
+                          {pos.titre}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: 'white', fontWeight: 'bold' }}>
+                          {formatCurrency(pos.valeur, pos.devise)}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', color: '#3498db' }}>
+                          {formatNumber(poids, 1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '25px', textAlign: 'center' }}>
+          <button
+            onClick={onClose}
+            className="btn"
+            style={{
+              padding: '10px 30px',
+              fontSize: '14px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
