@@ -37,6 +37,12 @@ urlpatterns = [
     path('cash/', views.list_cash, name='list_cash'),
     path('cash/<int:pk>/', views.cash_detail, name='cash_detail'),
     path('import/transactions/', views.import_transactions, name='import_transactions'),
+    path('import/cash/', views.import_cash, name='import_cash'),
+    path('import/target-portfolio/', views.import_target_portfolio, name='import_target_portfolio'),
+    path('import/users/', auth_views.import_users, name='import_users'),
     path('transactions/', views.list_transactions, name='list_transactions'),
     path('transactions/<int:pk>/', views.delete_transaction, name='delete_transaction'),
+    path('backup/', views.backup_all_data, name='backup_all_data'),
+    path('restore/', views.restore_all_data, name='restore_all_data'),
+    path('clear/', views.clear_all_data, name='clear_all_data'),
 ]

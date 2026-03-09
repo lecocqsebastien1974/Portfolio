@@ -21,6 +21,7 @@ from .serializers import (
     TransactionSerializer,
     CashSerializer
 )
+from . import file_storage
 
 @api_view(['GET'])
 def health_check(request):
@@ -142,24 +143,35 @@ def import_signaletique(request):
                 
                 statut_data = row_data.get('Type d\'instr') or ""
                 
-                # Gérer la catégorie d'actifs
+                # Gérer la catégorie d'actifs (on conserve juste le texte)
+                categorie_text = str(categorie).strip().capitalize() if categorie and str(categorie).strip() else None
+
+                # Persister dans le JSON via file_storage
+                sig_dict = file_storage.upsert_signaletique(
+                    code=str(code),
+                    isin=isin_value,
+                    titre=str(titre)[:500],
+                    description=str(description) if description else None,
+                    categorie_text=categorie_text,
+                    statut=str(statut_data)[:100] if statut_data else None,
+                    donnees_supplementaires=row_data
+                )
+
+                # Double-write vers PostgreSQL pour compatibilité FK résiduelle
                 categorie_instance = None
-                if categorie and str(categorie).strip():
-                    categorie_name = str(categorie).strip().capitalize()
-                    # Chercher ou créer l'AssetCategory
-                    categorie_instance, created = AssetCategory.objects.get_or_create(
-                        name=categorie_name,
-                        defaults={'description': f'Catégorie créée automatiquement lors de l\'import'}
+                if categorie_text:
+                    categorie_instance, _ = AssetCategory.objects.get_or_create(
+                        name=categorie_text,
+                        defaults={'description': 'Catégorie créée automatiquement lors de l\'import'}
                     )
-                
-                # Créer ou mettre à jour l'enregistrement
-                defaults = {
+
+                db_defaults = {
                     'code': str(code),
                     'isin': isin_value,
                     'titre': str(titre)[:500],
                     'description': str(description) if description else None,
                     'categorie': categorie_instance,
-                    'categorie_text': str(categorie)[:200] if categorie else None,
+                    'categorie_text': categorie_text,
                     'statut': str(statut_data)[:100] if statut_data else None,
                     'donnees_supplementaires': row_data
                 }
@@ -168,17 +180,9 @@ def import_signaletique(request):
                     continue
 
                 if isin_value:
-                    # Mettre à jour ou créer le titre avec l'ISIN
-                    signaletique, created = Signaletique.objects.update_or_create(
-                        isin=isin_value,
-                        defaults=defaults
-                    )
+                    Signaletique.objects.update_or_create(isin=isin_value, defaults=db_defaults)
                 else:
-                    # Sans ISIN, mettre à jour ou créer par code
-                    signaletique, created = Signaletique.objects.update_or_create(
-                        code=str(code),
-                        defaults=defaults
-                    )
+                    Signaletique.objects.update_or_create(code=str(code), defaults=db_defaults)
                 
                 nombre_succes += 1
                 
@@ -226,16 +230,41 @@ def import_signaletique(request):
 def list_signaletique(request):
     """Lister ou créer des signalétiques"""
     if request.method == 'GET':
-        signaletiques = Signaletique.objects.all()
-        serializer = SignaletiqueSerializer(signaletiques, many=True)
-        return Response(serializer.data)
-    
+        return Response(file_storage.get_all_signaletiques())
+
     elif request.method == 'POST':
-        serializer = SignaletiqueSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        isin_raw = request.data.get('isin', '')
+        isin = isin_raw.strip().upper() if isin_raw else None
+        titre = request.data.get('titre', '')
+        code = request.data.get('code', '')
+        if isin and len(isin) != 12:
+            return Response({'error': "L'ISIN doit avoir exactement 12 caractères"}, status=status.HTTP_400_BAD_REQUEST)
+        if not code and isin:
+            code = f'SIG_{isin}'
+        if not titre:
+            return Response({'error': 'Le titre est requis'}, status=status.HTTP_400_BAD_REQUEST)
+        sig_dict = file_storage.upsert_signaletique(
+            code=code, isin=isin, titre=titre,
+            description=request.data.get('description'),
+            categorie_text=request.data.get('categorie_text'),
+            statut=request.data.get('statut'),
+            donnees_supplementaires=request.data.get('donnees_supplementaires')
+        )
+        # Double-write DB
+        cat = None
+        cat_name = request.data.get('categorie_text')
+        if cat_name:
+            cat, _ = AssetCategory.objects.get_or_create(name=cat_name)
+        db_defaults = {'code': code, 'isin': isin, 'titre': titre,
+                       'description': request.data.get('description'),
+                       'categorie': cat, 'categorie_text': cat_name,
+                       'statut': request.data.get('statut'),
+                       'donnees_supplementaires': request.data.get('donnees_supplementaires')}
+        if isin:
+            Signaletique.objects.update_or_create(isin=isin, defaults=db_defaults)
+        else:
+            Signaletique.objects.update_or_create(code=code, defaults=db_defaults)
+        return Response(sig_dict, status=status.HTTP_201_CREATED)
 
 
 @api_view(['POST'])
@@ -253,70 +282,549 @@ def export_signaletique_csv(request):
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="signaletique_export.csv"'
     response.write('\ufeff')  # BOM UTF-8 pour Excel
-    
+
     writer = csv.writer(response)
-    
-    # Récupérer toutes les signalétiques
-    signaletiques = Signaletique.objects.all()
-    
-    if not signaletiques.exists():
+
+    signaletiques = file_storage.get_all_signaletiques()
+    if not signaletiques:
         writer.writerow(['Aucune donnée à exporter'])
         return response
-    
-    # Collecter tous les champs possibles
+
     all_fields = set()
     for sig in signaletiques:
-        if sig.donnees_supplementaires:
-            all_fields.update(sig.donnees_supplementaires.keys())
-    
-    # En-têtes : champs de base + champs supplémentaires
+        ds = sig.get('donnees_supplementaires') or {}
+        all_fields.update(ds.keys())
+
     headers = ['ID', 'Code', 'ISIN', 'Titre'] + sorted(all_fields)
     writer.writerow(headers)
-    
-    # Écrire les données
+
     for sig in signaletiques:
-        row = [
-            sig.id,
-            sig.code,
-            sig.isin or '',
-            sig.titre
-        ]
-        
-        # Ajouter les données supplémentaires
-        ds = sig.donnees_supplementaires or {}
+        row = [sig.get('id', ''), sig.get('code', ''), sig.get('isin') or '', sig.get('titre', '')]
+        ds = sig.get('donnees_supplementaires') or {}
         for field in sorted(all_fields):
             value = ds.get(field, '')
             row.append(value if value is not None else '')
-        
         writer.writerow(row)
-    
+
     return response
+
+
+@api_view(['POST'])
+def backup_all_data(request):
+    """Export toutes les données (cash, portefeuilles cibles, transactions, signalétique)
+    vers des fichiers Excel datés dans /app/sauvegarde/.
+    Les fichiers sont au même format que les modules d'import afin d'être réutilisables.
+    """
+    import os
+    from datetime import date as date_cls
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    SAUVEGARDE_DIR = '/app/sauvegarde'
+    os.makedirs(SAUVEGARDE_DIR, exist_ok=True)
+
+    today = date_cls.today().strftime('%Y-%m-%d')
+    fichiers_crees = []
+
+    def style_header(ws, col_count):
+        for col in range(1, col_count + 1):
+            cell = ws.cell(row=1, column=col)
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = PatternFill('solid', fgColor='2E4057')
+            cell.alignment = Alignment(horizontal='center')
+
+    # ── 1. CASH ──────────────────────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Cash'
+    headers_cash = ['Portefeuille', 'Banque', 'Montant', 'Devise', 'Date', 'Commentaire']
+    ws.append(headers_cash)
+    style_header(ws, len(headers_cash))
+    for c in file_storage.get_all_cash():
+        portfolio = file_storage.get_portfolio_by_id(c['portfolio_id'])
+        ws.append([
+            portfolio['name'] if portfolio else str(c['portfolio_id']),
+            c.get('banque', ''),
+            float(c['montant']) if c.get('montant') is not None else '',
+            c.get('devise', 'EUR'),
+            c.get('date', ''),
+            c.get('commentaire', '') or '',
+        ])
+    cash_path = os.path.join(SAUVEGARDE_DIR, f'lastcash_{today}.xlsx')
+    wb.save(cash_path)
+    fichiers_crees.append(f'lastcash_{today}.xlsx')
+
+    # ── 2. PORTEFEUILLES CIBLES ───────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Portefeuilles cibles'
+    headers_tp = ['Portefeuille', 'ISIN', 'Titre', 'Ratio']
+    ws.append(headers_tp)
+    style_header(ws, len(headers_tp))
+    for tp in file_storage.get_all_target_portfolios():
+        for item in (tp.get('items') or []):
+            sig = file_storage.get_signaletique_by_id(item.get('signaletique'))
+            ws.append([
+                tp['name'],
+                sig['isin'] if sig else '',
+                sig['titre'] if sig else '',
+                item.get('ratio', 0),
+            ])
+    tp_path = os.path.join(SAUVEGARDE_DIR, f'portefeuillecible_{today}.xlsx')
+    wb.save(tp_path)
+    fichiers_crees.append(f'portefeuillecible_{today}.xlsx')
+
+    # ── 3. TRANSACTIONS ───────────────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Transactions'
+    headers_tx = ['Date', 'Type', 'Isin', 'Quantité', 'Prix unitaire', 'Devise', 'Portefeuille']
+    ws.append(headers_tx)
+    style_header(ws, len(headers_tx))
+    for tx in file_storage.get_all_transactions():
+        sig = file_storage.get_signaletique_for_transaction(tx)
+        portfolio = file_storage.get_portfolio_by_id(tx.get('portfolio_id'))
+        ws.append([
+            tx.get('date', ''),
+            tx.get('type_operation', ''),
+            sig['isin'] if sig else '',
+            float(tx['quantite']) if tx.get('quantite') is not None else '',
+            float(tx['prix_unitaire']) if tx.get('prix_unitaire') is not None else '',
+            tx.get('devise', 'EUR'),
+            portfolio['name'] if portfolio else str(tx.get('portfolio_id', '')),
+        ])
+    tx_path = os.path.join(SAUVEGARDE_DIR, f'transactions_{today}.xlsx')
+    wb.save(tx_path)
+    fichiers_crees.append(f'transactions_{today}.xlsx')
+
+    # ── 4. SIGNALÉTIQUE ───────────────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Signaletique'
+    # Collecter tous les champs supplementaires
+    sigs = file_storage.get_all_signaletiques()
+    LAST_COLS = ['Frequence Coupon']  # colonnes toujours présentes en dernière position
+    extra_fields = []
+    seen = set(LAST_COLS)  # exclure des colonnes dynamiques pour les placer à la fin
+    for s in sigs:
+        for k in (s.get('donnees_supplementaires') or {}):
+            if k not in seen:
+                extra_fields.append(k)
+                seen.add(k)
+    extra_fields += LAST_COLS  # ajouter en dernier, qu'il y ait des données ou non
+    headers_sig = ['Isin', 'Nom', "Classe d'actifs", "Type d'instr"] + extra_fields
+    ws.append(headers_sig)
+    style_header(ws, len(headers_sig))
+    for s in sigs:
+        ds = s.get('donnees_supplementaires') or {}
+        row = [
+            s.get('isin', '') or '',
+            s.get('titre', ''),
+            s.get('categorie_text', '') or '',
+            s.get('statut', '') or '',
+        ] + [ds.get(f, '') for f in extra_fields]
+        ws.append(row)
+    sig_path = os.path.join(SAUVEGARDE_DIR, f'signaletique_{today}.xlsx')
+    wb.save(sig_path)
+    fichiers_crees.append(f'signaletique_{today}.xlsx')
+
+    # ── 5. UTILISATEURS ───────────────────────────────────────────────────────────────────────
+    from django.contrib.auth.models import User as DjangoUser
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Utilisateurs'
+    headers_users = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser', 'is_active', 'password_hash']
+    ws.append(headers_users)
+    style_header(ws, len(headers_users))
+    for u in DjangoUser.objects.all().order_by('id'):
+        ws.append([
+            u.username,
+            u.email or '',
+            u.first_name or '',
+            u.last_name or '',
+            u.is_staff,
+            u.is_superuser,
+            u.is_active,
+            u.password,  # hash Django (pbkdf2_sha256$...)
+        ])
+    users_path = os.path.join(SAUVEGARDE_DIR, f'utilisateurs_{today}.xlsx')
+    wb.save(users_path)
+    fichiers_crees.append(f'utilisateurs_{today}.xlsx')
+    nb_users = DjangoUser.objects.count()
+
+    return Response({
+        'success': True,
+        'date': today,
+        'repertoire': SAUVEGARDE_DIR,
+        'fichiers': fichiers_crees,
+        'stats': {
+            'cash': len(file_storage.get_all_cash()),
+            'portefeuilles_cibles': len(file_storage.get_all_target_portfolios()),
+            'transactions': len(file_storage.get_all_transactions()),
+            'signaletiques': len(sigs),
+            'utilisateurs': nb_users,
+        }
+    })
+
+
+@api_view(['POST'])
+def restore_all_data(request):
+    """Restaure toutes les données depuis les fichiers les plus récents de /app/sauvegarde/.
+    Ordre : signalétique → transactions → cash → portefeuilles cibles → utilisateurs.
+    Réservé aux superusers.
+    """
+    if not request.user.is_superuser:
+        return Response({'error': 'Réservé aux superusers'}, status=status.HTTP_403_FORBIDDEN)
+
+    import glob
+    from django.contrib.auth.models import User as DjangoUser
+
+    SAUVEGARDE_DIR = '/app/sauvegarde'
+    results = {}
+
+    def latest_file(prefix):
+        files = sorted(glob.glob(os.path.join(SAUVEGARDE_DIR, f'{prefix}_*.xlsx')))
+        return files[-1] if files else None
+
+    def sanitize_date(v):
+        if isinstance(v, datetime):
+            return v.date()
+        if isinstance(v, date):
+            return v
+        return v
+
+    # ── 1. SIGNALÉTIQUE ──────────────────────────────────────────────────────
+    sig_path = latest_file('signaletique')
+    if sig_path:
+        try:
+            wb = openpyxl.load_workbook(sig_path)
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            succes = 0
+            erreurs_list = []
+
+            def _sanitize_sig(value):
+                if isinstance(value, (datetime, date)):
+                    return value.isoformat()
+                return value
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(c is not None and str(c).strip() != '' for c in row):
+                    continue
+                row_data = {h: _sanitize_sig(v) for h, v in zip(headers, row)}
+                isin_raw = row_data.get('Isin') or row_data.get('ISIN') or row_data.get('isin')
+                isin_value = str(isin_raw).strip().upper() if isin_raw else None
+                if not isin_value:
+                    isin_value = None
+                if isin_value and len(isin_value) != 12:
+                    erreurs_list.append(f"Ligne {row_idx}: ISIN invalide ({isin_value})")
+                    continue
+                code = f"SIG_{isin_value}" if isin_value else f"AUTO_{row_idx}"
+                titre = row_data.get('Nom') or ''
+                categorie_text = str(row_data.get("Classe d'actifs") or '').strip().capitalize() or None
+                statut_data = str(row_data.get("Type d'instr") or '')
+                sig_dict = file_storage.upsert_signaletique(
+                    code=str(code), isin=isin_value, titre=str(titre)[:500],
+                    categorie_text=categorie_text,
+                    statut=statut_data[:100] if statut_data else None,
+                    donnees_supplementaires=row_data,
+                )
+                categorie_instance = None
+                if categorie_text:
+                    categorie_instance, _ = AssetCategory.objects.get_or_create(
+                        name=categorie_text,
+                        defaults={'description': 'Catégorie créée automatiquement lors de la restauration'},
+                    )
+                if not isin_value and not str(titre).strip():
+                    continue
+                db_defaults = {
+                    'code': str(code), 'isin': isin_value, 'titre': str(titre)[:500],
+                    'categorie': categorie_instance, 'categorie_text': categorie_text,
+                    'statut': statut_data[:100] if statut_data else None,
+                    'donnees_supplementaires': row_data,
+                }
+                if isin_value:
+                    Signaletique.objects.update_or_create(isin=isin_value, defaults=db_defaults)
+                else:
+                    Signaletique.objects.update_or_create(code=str(code), defaults=db_defaults)
+                succes += 1
+
+            results['signaletique'] = {'succes': succes, 'erreurs': len(erreurs_list), 'fichier': os.path.basename(sig_path)}
+        except Exception as e:
+            results['signaletique'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(sig_path), 'error': str(e)}
+    else:
+        results['signaletique'] = {'error': 'Aucun fichier signaletique_*.xlsx trouvé dans Sauvegarde/'}
+
+    # ── 2. TRANSACTIONS ───────────────────────────────────────────────────────
+    tx_path = latest_file('transactions')
+    if tx_path:
+        try:
+            wb = openpyxl.load_workbook(tx_path)
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            succes = 0
+            doublons = 0
+            erreurs_list = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(c is not None and str(c).strip() != '' for c in row):
+                    continue
+                row_data = {h: sanitize_date(v) for h, v in zip(headers, row)}
+                date_tx = row_data.get('Date')
+                type_op = str(row_data.get('Type') or row_data.get('Sens') or '').strip().upper()
+                isin = row_data.get('Isin') or row_data.get('ISIN') or row_data.get('isin')
+                if isin:
+                    isin = str(isin).strip().upper()
+                quantite = row_data.get('Quantité') or row_data.get('quantite') or row_data.get('Quantite')
+                prix = row_data.get('Prix unitaire') or row_data.get('prix unitaire') or row_data.get('Prix Unitaire')
+                devise = str(row_data.get('Devise') or 'EUR')
+                nom_portfolio = str(row_data.get('Portefeuille') or 'Défaut')
+
+                if not all([type_op, isin, quantite, prix]):
+                    erreurs_list.append(f"Ligne {row_idx}: champs obligatoires manquants")
+                    continue
+                if len(isin) != 12:
+                    erreurs_list.append(f"Ligne {row_idx}: ISIN invalide ({isin})")
+                    continue
+                if type_op not in ['ACHAT', 'VENTE']:
+                    type_op = 'ACHAT' if 'achat' in type_op.lower() else 'VENTE'
+
+                portfolio, _ = file_storage.get_or_create_portfolio(
+                    nom_portfolio, defaults={'description': f'Portefeuille {nom_portfolio}'}
+                )
+                sig_dict = file_storage.get_signaletique_by_isin(isin)
+                if not sig_dict:
+                    sig_dict = file_storage.upsert_signaletique(
+                        code=f'TEMP_{isin}', isin=isin, titre=f'[À compléter] {isin}'
+                    )
+                    Signaletique.objects.get_or_create(
+                        isin=isin, defaults={'code': f'TEMP_{isin}', 'titre': f'[À compléter] {isin}'}
+                    )
+
+                q = Decimal(str(quantite))
+                p = Decimal(str(prix))
+                date_str = date_tx.isoformat() if hasattr(date_tx, 'isoformat') else str(date_tx)
+
+                if file_storage.transaction_exists(portfolio['id'], sig_dict['id'], date_str, type_op, q, p, isin=isin):
+                    doublons += 1
+                    continue
+
+                file_storage.create_transaction(portfolio['id'], sig_dict['id'], date_str, type_op, q, p, devise, isin=isin)
+                succes += 1
+
+            results['transactions'] = {
+                'succes': succes, 'doublons': doublons,
+                'erreurs': len(erreurs_list), 'fichier': os.path.basename(tx_path),
+            }
+        except Exception as e:
+            results['transactions'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(tx_path), 'error': str(e)}
+    else:
+        results['transactions'] = {'error': 'Aucun fichier transactions_*.xlsx trouvé dans Sauvegarde/'}
+
+    # ── 3. CASH ───────────────────────────────────────────────────────────────
+    cash_path = latest_file('lastcash')
+    if cash_path:
+        try:
+            wb = openpyxl.load_workbook(cash_path)
+            ws = wb.active
+            headers = [str(cell.value or '').strip() for cell in ws[1]]
+            succes = 0
+            erreurs_list = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(c is not None and str(c).strip() != '' for c in row):
+                    continue
+                row_data = {h: v for h, v in zip(headers, row)}
+                nom_portfolio = str(row_data.get('Portefeuille') or '').strip()
+                banque = str(row_data.get('Banque') or '').strip()
+                montant_raw = row_data.get('Montant')
+                devise = str(row_data.get('Devise') or 'EUR')
+                date_raw = row_data.get('Date')
+                commentaire = str(row_data.get('Commentaire') or '').strip() or None
+
+                if not all([nom_portfolio, banque, montant_raw, date_raw]):
+                    erreurs_list.append(f"Ligne {row_idx}: champs manquants")
+                    continue
+
+                montant = Decimal(str(montant_raw))
+                if isinstance(date_raw, datetime):
+                    date_obj = date_raw.date()
+                elif isinstance(date_raw, date):
+                    date_obj = date_raw
+                else:
+                    date_obj = datetime.fromisoformat(str(date_raw)).date()
+
+                portfolio, _ = file_storage.get_or_create_portfolio(
+                    nom_portfolio, defaults={'description': f'Portefeuille {nom_portfolio}'}
+                )
+                file_storage.create_cash(portfolio['id'], banque, montant, devise, date_obj, commentaire)
+                succes += 1
+
+            results['cash'] = {'succes': succes, 'erreurs': len(erreurs_list), 'fichier': os.path.basename(cash_path)}
+        except Exception as e:
+            results['cash'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(cash_path), 'error': str(e)}
+    else:
+        results['cash'] = {'error': 'Aucun fichier lastcash_*.xlsx trouvé dans Sauvegarde/'}
+
+    # ── 4. PORTEFEUILLES CIBLES ───────────────────────────────────────────────
+    tp_path = latest_file('portefeuillecible')
+    if tp_path:
+        try:
+            wb = openpyxl.load_workbook(tp_path)
+            ws = wb.active
+            headers = [str(cell.value or '').strip() for cell in ws[1]]
+            portfolios_data = {}
+            succes = 0
+            erreurs_list = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(c is not None and str(c).strip() != '' for c in row):
+                    continue
+                row_data = {h: v for h, v in zip(headers, row)}
+                nom_p = str(row_data.get('Portefeuille') or '').strip()
+                titre_raw = str(row_data.get('ISIN') or row_data.get('Isin') or row_data.get('Titre') or '').strip()
+                ratio_raw = row_data.get('Ratio')
+
+                if not all([nom_p, titre_raw, ratio_raw]):
+                    erreurs_list.append(f"Ligne {row_idx}: champs manquants")
+                    continue
+
+                sig = (
+                    file_storage.get_signaletique_by_isin(titre_raw) or
+                    file_storage.get_signaletique_by_code(titre_raw) or
+                    file_storage.search_signaletique_by_titre(titre_raw)
+                )
+                if not sig:
+                    erreurs_list.append(f"Ligne {row_idx}: ISIN/titre introuvable ({titre_raw})")
+                    continue
+
+                if nom_p not in portfolios_data:
+                    portfolios_data[nom_p] = []
+                portfolios_data[nom_p].append({'signaletique': sig['id'], 'ratio': float(str(ratio_raw))})
+
+            for nom, items in portfolios_data.items():
+                existing = file_storage.get_target_portfolio_by_name(nom)
+                if existing:
+                    file_storage.update_target_portfolio(existing['id'], name=nom, items=items)
+                else:
+                    file_storage.create_target_portfolio(nom, items)
+                succes += 1
+
+            results['portefeuilles_cibles'] = {
+                'succes': succes, 'erreurs': len(erreurs_list), 'fichier': os.path.basename(tp_path),
+            }
+        except Exception as e:
+            results['portefeuilles_cibles'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(tp_path), 'error': str(e)}
+    else:
+        results['portefeuilles_cibles'] = {'error': 'Aucun fichier portefeuillecible_*.xlsx trouvé dans Sauvegarde/'}
+
+    # ── 5. UTILISATEURS ───────────────────────────────────────────────────────
+    users_path = latest_file('utilisateurs')
+    if users_path:
+        try:
+            wb = openpyxl.load_workbook(users_path)
+            ws = wb.active
+            headers = [str(c.value or '').strip() for c in ws[1]]
+            crees = 0
+            mis_a_jour = 0
+            erreurs_list = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                row_data = {h: v for h, v in zip(headers, row)}
+                username = str(row_data.get('username') or '').strip()
+                if not username:
+                    continue
+                password_hash = str(row_data.get('password_hash') or '').strip()
+                if not password_hash:
+                    erreurs_list.append(f"Ligne {row_idx}: password_hash manquant pour {username}")
+                    continue
+                try:
+                    user, created = DjangoUser.objects.get_or_create(
+                        username=username,
+                        defaults={
+                            'email': str(row_data.get('email') or ''),
+                            'first_name': str(row_data.get('first_name') or ''),
+                            'last_name': str(row_data.get('last_name') or ''),
+                            'is_staff': bool(row_data.get('is_staff')),
+                            'is_superuser': bool(row_data.get('is_superuser')),
+                            'is_active': row_data.get('is_active') != False,
+                        },
+                    )
+                    user.password = password_hash
+                    if not created:
+                        user.email = str(row_data.get('email') or '')
+                        user.first_name = str(row_data.get('first_name') or '')
+                        user.last_name = str(row_data.get('last_name') or '')
+                        user.is_staff = bool(row_data.get('is_staff'))
+                        user.is_superuser = bool(row_data.get('is_superuser'))
+                        user.is_active = row_data.get('is_active') != False
+                    user.save()
+                    if created:
+                        crees += 1
+                    else:
+                        mis_a_jour += 1
+                except Exception as e:
+                    erreurs_list.append(f"Ligne {row_idx}: {str(e)}")
+
+            results['utilisateurs'] = {
+                'crees': crees, 'mis_a_jour': mis_a_jour,
+                'erreurs': len(erreurs_list), 'fichier': os.path.basename(users_path),
+            }
+        except Exception as e:
+            results['utilisateurs'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(users_path), 'error': str(e)}
+    else:
+        results['utilisateurs'] = {'error': 'Aucun fichier utilisateurs_*.xlsx trouvé dans Sauvegarde/'}
+
+    return Response({'success': True, 'details': results})
+
+
+@api_view(['POST'])
+def clear_all_data(request):
+    """Supprime tous les fichiers JSON de /app/data/ et tous les fichiers Excel de /app/sauvegarde/.
+    Ne supprime aucun fichier non-JSON / non-xlsx (ex : README.md).
+    Réservé aux superusers.
+    """
+    if not request.user.is_superuser:
+        return Response({'error': 'Réservé aux superusers'}, status=status.HTTP_403_FORBIDDEN)
+
+    import glob
+
+    deleted = []
+    for f in glob.glob('/app/data/*.json'):
+        os.remove(f)
+        deleted.append(os.path.basename(f))
+    for f in glob.glob('/app/sauvegarde/*.xlsx'):
+        os.remove(f)
+        deleted.append(os.path.basename(f))
+
+    return Response({'success': True, 'supprime': deleted, 'total': len(deleted)})
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def signaletique_detail(request, pk):
     """Récupérer, modifier ou supprimer une signalétique"""
-    try:
-        signaletique = Signaletique.objects.get(pk=pk)
-    except Signaletique.DoesNotExist:
-        return Response(
-            {'error': 'Signalétique non trouvée'},
-            status=status.HTTP_404_NOT_FOUND
-        )
-    
+    sig_dict = file_storage.get_signaletique_by_id(int(pk))
+    if not sig_dict:
+        return Response({'error': 'Signalétique non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+
     if request.method == 'GET':
-        serializer = SignaletiqueSerializer(signaletique)
-        return Response(serializer.data)
-    
+        return Response(sig_dict)
+
     elif request.method == 'PUT':
-        serializer = SignaletiqueSerializer(signaletique, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        allowed = ['titre', 'description', 'categorie_text', 'statut', 'donnees_supplementaires']
+        update_data = {k: v for k, v in request.data.items() if k in allowed}
+        updated = file_storage.update_signaletique(int(pk), update_data)
+        # Sync DB
+        try:
+            db_sig = Signaletique.objects.get(pk=pk)
+            for k, v in update_data.items():
+                setattr(db_sig, k, v)
+            db_sig.save()
+        except Signaletique.DoesNotExist:
+            pass
+        return Response(updated)
+
     elif request.method == 'DELETE':
-        # Suppression désactivée - les signalétiques ne peuvent pas être supprimées
         return Response(
             {'error': 'La suppression des signalétiques est désactivée pour préserver l\'intégrité des données'},
             status=status.HTTP_403_FORBIDDEN
@@ -334,90 +842,111 @@ def import_logs(request):
 @api_view(['GET', 'POST'])
 def list_target_portfolios(request):
     if request.method == 'GET':
-        portfolios = TargetPortfolio.objects.all()
-        serializer = TargetPortfolioSerializer(portfolios, many=True)
-        return Response(serializer.data)
+        return Response(file_storage.get_all_target_portfolios())
 
     elif request.method == 'POST':
-        serializer = TargetPortfolioSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        name = request.data.get('name', '').strip()
+        items = request.data.get('items', [])
+        if not name:
+            return Response({'error': 'Le nom est requis'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            portfolio = file_storage.create_target_portfolio(name, items)
+            return Response(portfolio, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def target_portfolio_detail(request, pk):
-    try:
-        portfolio = TargetPortfolio.objects.get(pk=pk)
-    except TargetPortfolio.DoesNotExist:
-        return Response(
-            {'error': 'Portefeuille cible non trouve'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+    portfolio = file_storage.get_target_portfolio_by_id(int(pk))
+    if not portfolio:
+        return Response({'error': 'Portefeuille cible non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = TargetPortfolioSerializer(portfolio)
-        return Response(serializer.data)
+        return Response(portfolio)
 
     elif request.method == 'PUT':
-        serializer = TargetPortfolioSerializer(portfolio, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        name = request.data.get('name', '').strip() or None
+        items = request.data.get('items', None)
+        try:
+            updated = file_storage.update_target_portfolio(int(pk), name=name, items=items)
+            if updated:
+                return Response(updated)
+            return Response({'error': 'Portefeuille cible non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        portfolio.delete()
-        return Response(
-            {'success': True, 'message': 'Portefeuille cible supprime'},
-            status=status.HTTP_204_NO_CONTENT
-        )
+        if file_storage.delete_target_portfolio(int(pk)):
+            return Response({'success': True, 'message': 'Portefeuille cible supprimé'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'error': 'Portefeuille cible non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET', 'POST'])
 def list_real_portfolios(request):
     """Liste ou crée des portefeuilles réels"""
     if request.method == 'GET':
-        portfolios = RealPortfolio.objects.all()
-        serializer = RealPortfolioSerializer(portfolios, many=True)
-        return Response(serializer.data)
+        portfolios = file_storage.get_all_portfolios()
+        return Response(portfolios)
     
     elif request.method == 'POST':
-        serializer = RealPortfolioSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        name = request.data.get('name')
+        description = request.data.get('description')
+        
+        if not name:
+            return Response(
+                {'error': 'Le nom du portefeuille est requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            portfolio = file_storage.create_portfolio(name, description)
+            return Response(portfolio, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def real_portfolio_detail(request, pk):
     """Récupère, modifie ou supprime un portefeuille réel"""
-    try:
-        portfolio = RealPortfolio.objects.get(pk=pk)
-    except RealPortfolio.DoesNotExist:
+    portfolio = file_storage.get_portfolio_by_id(int(pk))
+    
+    if not portfolio:
         return Response(
             {'error': 'Portefeuille non trouve'},
             status=status.HTTP_404_NOT_FOUND
         )
     
     if request.method == 'GET':
-        serializer = RealPortfolioSerializer(portfolio)
-        return Response(serializer.data)
+        return Response(portfolio)
     
     elif request.method == 'PUT':
-        serializer = RealPortfolioSerializer(portfolio, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            updated_portfolio = file_storage.update_portfolio(int(pk), request.data)
+            if updated_portfolio:
+                return Response(updated_portfolio)
+            return Response(
+                {'error': 'Portefeuille non trouve'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     elif request.method == 'DELETE':
-        portfolio.delete()
+        if file_storage.delete_portfolio(int(pk)):
+            return Response(
+                {'success': True, 'message': 'Portefeuille supprime avec toutes ses transactions et cash'},
+                status=status.HTTP_204_NO_CONTENT
+            )
         return Response(
-            {'success': True, 'message': 'Portefeuille supprime'},
-            status=status.HTTP_204_NO_CONTENT
+            {'error': 'Portefeuille non trouve'},
+            status=status.HTTP_404_NOT_FOUND
         )
 
 
@@ -428,48 +957,328 @@ def list_cash(request):
         # Optionnel: filtrer par portfolio si fourni dans les params
         portfolio_id = request.query_params.get('portfolio_id', None)
         if portfolio_id:
-            cash_entries = Cash.objects.filter(portfolio_id=portfolio_id)
+            cash_entries = file_storage.get_cash_by_portfolio(int(portfolio_id))
         else:
-            cash_entries = Cash.objects.all()
-        serializer = CashSerializer(cash_entries, many=True)
-        return Response(serializer.data)
+            cash_entries = file_storage.get_all_cash()
+        return Response(cash_entries)
     
     elif request.method == 'POST':
-        serializer = CashSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        portfolio_id = request.data.get('portfolio_id') or request.data.get('portfolio')
+        banque = request.data.get('banque')
+        montant = request.data.get('montant')
+        devise = request.data.get('devise', 'EUR')
+        date_str = request.data.get('date')
+        commentaire = request.data.get('commentaire')
+        
+        # Validation
+        if not all([portfolio_id, banque, montant, date_str]):
+            return Response(
+                {'error': 'Les champs portfolio_id, banque, montant et date sont requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Vérifier que le portefeuille existe
+        portfolio = file_storage.get_portfolio_by_id(int(portfolio_id))
+        if not portfolio:
+            return Response(
+                {'error': 'Portefeuille non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Convertir la date
+        try:
+            if isinstance(date_str, str):
+                date_obj = datetime.fromisoformat(date_str).date()
+            else:
+                date_obj = date_str
+        except (ValueError, AttributeError):
+            return Response(
+                {'error': 'Format de date invalide. Utilisez le format ISO (YYYY-MM-DD)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            cash = file_storage.create_cash(
+                int(portfolio_id),
+                banque,
+                Decimal(str(montant)),
+                devise,
+                date_obj,
+                commentaire
+            )
+            return Response(cash, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur lors de la création: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def cash_detail(request, pk):
     """Récupère, modifie ou supprime une entrée de cash"""
-    try:
-        cash = Cash.objects.get(pk=pk)
-    except Cash.DoesNotExist:
+    cash = file_storage.get_cash_by_id(int(pk))
+    
+    if not cash:
         return Response(
             {'error': 'Entree de cash non trouvee'},
             status=status.HTTP_404_NOT_FOUND
         )
     
     if request.method == 'GET':
-        serializer = CashSerializer(cash)
-        return Response(serializer.data)
+        return Response(cash)
     
     elif request.method == 'PUT':
-        serializer = CashSerializer(cash, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Préparer les données à mettre à jour
+        update_data = {}
+        if 'banque' in request.data:
+            update_data['banque'] = request.data['banque']
+        if 'montant' in request.data:
+            update_data['montant'] = str(Decimal(str(request.data['montant'])))
+        if 'devise' in request.data:
+            update_data['devise'] = request.data['devise']
+        if 'date' in request.data:
+            date_str = request.data['date']
+            if isinstance(date_str, str):
+                update_data['date'] = datetime.fromisoformat(date_str).date().isoformat()
+            else:
+                update_data['date'] = date_str
+        if 'commentaire' in request.data:
+            update_data['commentaire'] = request.data['commentaire']
+        
+        updated_cash = file_storage.update_cash(int(pk), update_data)
+        if updated_cash:
+            return Response(updated_cash)
+        return Response(
+            {'error': 'Entree de cash non trouvee'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     
     elif request.method == 'DELETE':
-        cash.delete()
+        if file_storage.delete_cash(int(pk)):
+            return Response(
+                {'success': True, 'message': 'Entree de cash supprimee'},
+                status=status.HTTP_204_NO_CONTENT
+            )
         return Response(
-            {'success': True, 'message': 'Entree de cash supprimee'},
-            status=status.HTTP_204_NO_CONTENT
+            {'error': 'Entree de cash non trouvee'},
+            status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def import_cash(request):
+    """Import des positions cash depuis un fichier Excel.
+    Colonnes attendues: Portefeuille, Banque, Montant, Devise, Date, Commentaire
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+
+    file = request.FILES['file']
+    if not file.name.endswith(('.xlsx', '.xls')):
+        return Response({'error': 'Format non supporté. Utilisez .xlsx ou .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+    import_log = ImportLog.objects.create(
+        type_import='cash',
+        nom_fichier=file.name,
+        statut='en_cours'
+    )
+
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        headers = [str(cell.value).strip() if cell.value is not None else '' for cell in ws[1]]
+
+        nombre_succes = 0
+        nombre_erreurs = 0
+        erreurs = []
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(cell is not None and str(cell).strip() != '' for cell in row):
+                continue
+
+            row_data = {header: value for header, value in zip(headers, row)}
+
+            nom_portfolio = (
+                str(row_data.get('Portefeuille') or row_data.get('portefeuille') or '').strip()
+            )
+            banque = str(row_data.get('Banque') or row_data.get('banque') or '').strip()
+            montant_raw = row_data.get('Montant') or row_data.get('montant')
+            devise = str(row_data.get('Devise') or row_data.get('devise') or 'EUR').strip()
+            date_raw = row_data.get('Date') or row_data.get('date')
+            commentaire = str(row_data.get('Commentaire') or row_data.get('commentaire') or '').strip() or None
+
+            if not all([nom_portfolio, banque, montant_raw, date_raw]):
+                missing = []
+                if not nom_portfolio: missing.append('Portefeuille')
+                if not banque: missing.append('Banque')
+                if not montant_raw: missing.append('Montant')
+                if not date_raw: missing.append('Date')
+                erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Champs manquants: {", ".join(missing)}'})
+                nombre_erreurs += 1
+                continue
+
+            try:
+                montant_decimal = Decimal(str(montant_raw))
+            except Exception:
+                erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Montant invalide: {montant_raw}'})
+                nombre_erreurs += 1
+                continue
+
+            if isinstance(date_raw, (datetime, date)):
+                date_obj = date_raw.date() if isinstance(date_raw, datetime) else date_raw
+            else:
+                try:
+                    date_obj = datetime.fromisoformat(str(date_raw)).date()
+                except ValueError:
+                    erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Date invalide: {date_raw}'})
+                    nombre_erreurs += 1
+                    continue
+
+            portfolio, _ = file_storage.get_or_create_portfolio(
+                nom_portfolio,
+                defaults={'description': f'Portefeuille {nom_portfolio}'}
+            )
+
+            file_storage.create_cash(portfolio['id'], banque, montant_decimal, devise, date_obj, commentaire)
+            nombre_succes += 1
+
+        import_log.nombre_lignes = ws.max_row - 1
+        import_log.nombre_succes = nombre_succes
+        import_log.nombre_erreurs = nombre_erreurs
+        import_log.erreurs = erreurs if erreurs else None
+        import_log.statut = 'termine' if nombre_erreurs == 0 else 'termine_avec_erreurs'
+        import_log.save()
+
+        return Response({
+            'success': True,
+            'message': 'Import cash terminé',
+            'details': {
+                'fichier': file.name,
+                'lignes_totales': ws.max_row - 1,
+                'succes': nombre_succes,
+                'erreurs': nombre_erreurs,
+                'liste_erreurs': erreurs[:10] if erreurs else []
+            }
+        })
+
+    except Exception as e:
+        import_log.statut = 'erreur'
+        import_log.save()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def import_target_portfolio(request):
+    """Import de portefeuilles cibles depuis un fichier Excel.
+    Colonnes attendues: Portefeuille, Titre (nom/ISIN/code du titre), Ratio
+    Plusieurs lignes avec le même nom de portefeuille → un seul portefeuille.
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+
+    file = request.FILES['file']
+    if not file.name.endswith(('.xlsx', '.xls')):
+        return Response({'error': 'Format non supporté. Utilisez .xlsx ou .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+    import_log = ImportLog.objects.create(
+        type_import='target_portfolio',
+        nom_fichier=file.name,
+        statut='en_cours'
+    )
+
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        headers = [str(cell.value).strip() if cell.value is not None else '' for cell in ws[1]]
+
+        nombre_succes = 0
+        nombre_erreurs = 0
+        erreurs = []
+
+        # Regrouper les lignes par nom de portefeuille
+        portfolios_data = {}  # name → list of items
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(cell is not None and str(cell).strip() != '' for cell in row):
+                continue
+
+            row_data = {header: value for header, value in zip(headers, row)}
+
+            nom_portfolio = str(row_data.get('Portefeuille') or row_data.get('portefeuille') or '').strip()
+            titre_raw = str(row_data.get('Titre') or row_data.get('titre') or row_data.get('ISIN') or row_data.get('isin') or '').strip()
+            ratio_raw = row_data.get('Ratio') or row_data.get('ratio') or row_data.get('%') or row_data.get('Poids')
+
+            if not all([nom_portfolio, titre_raw, ratio_raw]):
+                missing = []
+                if not nom_portfolio: missing.append('Portefeuille')
+                if not titre_raw: missing.append('Titre')
+                if not ratio_raw: missing.append('Ratio')
+                erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Champs manquants: {", ".join(missing)}'})
+                nombre_erreurs += 1
+                continue
+
+            try:
+                ratio = float(str(ratio_raw))
+            except ValueError:
+                erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Ratio invalide: {ratio_raw}'})
+                nombre_erreurs += 1
+                continue
+
+            # Résoudre le titre : chercher par ISIN, puis code, puis titre
+            sig = (
+                file_storage.get_signaletique_by_isin(titre_raw) or
+                file_storage.get_signaletique_by_code(titre_raw) or
+                file_storage.search_signaletique_by_titre(titre_raw)
+            )
+
+            if not sig:
+                erreurs.append({'ligne': row_idx, 'type': 'erreur', 'erreur': f'Titre introuvable: {titre_raw}'})
+                nombre_erreurs += 1
+                continue
+
+            if nom_portfolio not in portfolios_data:
+                portfolios_data[nom_portfolio] = []
+            portfolios_data[nom_portfolio].append({'signaletique': sig['id'], 'ratio': ratio})
+
+        # Créer ou mettre à jour les portefeuilles cibles via file_storage
+        for nom, items in portfolios_data.items():
+            try:
+                existing = file_storage.get_target_portfolio_by_name(nom)
+                if existing:
+                    file_storage.update_target_portfolio(existing['id'], name=nom, items=items)
+                else:
+                    file_storage.create_target_portfolio(nom, items)
+                nombre_succes += 1
+            except ValueError as e:
+                erreurs.append({'ligne': 0, 'type': 'erreur', 'erreur': f'Portefeuille "{nom}": {str(e)}'})
+                nombre_erreurs += 1
+
+        import_log.nombre_lignes = ws.max_row - 1
+        import_log.nombre_succes = nombre_succes
+        import_log.nombre_erreurs = nombre_erreurs
+        import_log.erreurs = erreurs if erreurs else None
+        import_log.statut = 'termine' if nombre_erreurs == 0 else 'termine_avec_erreurs'
+        import_log.save()
+
+        return Response({
+            'success': True,
+            'message': 'Import portefeuilles cibles terminé',
+            'details': {
+                'fichier': file.name,
+                'lignes_totales': ws.max_row - 1,
+                'portefeuilles_crees': nombre_succes,
+                'erreurs': nombre_erreurs,
+                'liste_erreurs': erreurs[:10] if erreurs else []
+            }
+        })
+
+    except Exception as e:
+        import_log.statut = 'erreur'
+        import_log.save()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -600,8 +1409,8 @@ def import_transactions(request):
                     type_operation = 'ACHAT' if 'achat' in type_operation.lower() else 'VENTE'
                 
                 # Récupérer ou créer le portefeuille
-                portfolio, _ = RealPortfolio.objects.get_or_create(
-                    name=nom_portfolio,
+                portfolio, _ = file_storage.get_or_create_portfolio(
+                    nom_portfolio,
                     defaults={'description': f'Portefeuille {nom_portfolio}'}
                 )
                 
@@ -616,15 +1425,21 @@ def import_transactions(request):
                     continue
                 
                 # Récupérer la signalétique - Recherche exacte uniquement
-                try:
-                    signaletique = Signaletique.objects.get(isin=isin)
-                except Signaletique.DoesNotExist:
-                    # ISIN inconnu - ajouter à la liste et créer une signalétique temporaire
+                sig_dict = file_storage.get_signaletique_by_isin(isin)
+                if sig_dict:
+                    signaletique_id = sig_dict['id']
+                else:
+                    # ISIN inconnu - créer dans JSON + DB
                     isins_inconnus.add(isin)
-                    signaletique = Signaletique.objects.create(
-                        code=f"TEMP_{isin}",
+                    sig_dict = file_storage.upsert_signaletique(
+                        code=f'TEMP_{isin}', isin=isin,
+                        titre=f'[À compléter] {isin}'
+                    )
+                    signaletique_id = sig_dict['id']
+                    # Double-write DB
+                    db_sig, _ = Signaletique.objects.get_or_create(
                         isin=isin,
-                        titre=f"[À compléter] {isin}"
+                        defaults={'code': f'TEMP_{isin}', 'titre': f'[À compléter] {isin}'}
                     )
                     erreurs.append({
                         'ligne': row_idx,
@@ -636,17 +1451,17 @@ def import_transactions(request):
                 quantite_decimal = Decimal(str(quantite))
                 prix_unitaire_decimal = Decimal(str(prix_unitaire))
                 
-                existing_transaction = Transaction.objects.filter(
-                    portfolio=portfolio,
-                    signaletique=signaletique,
-                    date=date_transaction,
-                    type_operation=type_operation,
-                    quantite=quantite_decimal,
-                    prix_unitaire=prix_unitaire_decimal
-                ).exists()
-                
+                existing_transaction = file_storage.transaction_exists(
+                    portfolio['id'],
+                    signaletique_id,
+                    date_transaction.isoformat() if hasattr(date_transaction, 'isoformat') else date_transaction,
+                    type_operation,
+                    quantite_decimal,
+                    prix_unitaire_decimal,
+                    isin=isin
+                )
+
                 if existing_transaction:
-                    # Transaction déjà existante, on la saute
                     nombre_doublons += 1
                     erreurs.append({
                         'ligne': row_idx,
@@ -654,15 +1469,15 @@ def import_transactions(request):
                         'erreur': 'Transaction déjà importée (doublon détecté)'
                     })
                 else:
-                    # Créer la transaction
-                    Transaction.objects.create(
-                        portfolio=portfolio,
-                        signaletique=signaletique,
-                        date=date_transaction,
-                        type_operation=type_operation,
-                        quantite=quantite_decimal,
-                        prix_unitaire=prix_unitaire_decimal,
-                        devise=devise
+                    file_storage.create_transaction(
+                        portfolio['id'],
+                        signaletique_id,
+                        date_transaction,
+                        type_operation,
+                        quantite_decimal,
+                        prix_unitaire_decimal,
+                        devise,
+                        isin=isin
                     )
                     
                     nombre_succes += 1
@@ -762,35 +1577,106 @@ def import_transactions(request):
         )
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 def list_transactions(request):
-    """Liste toutes les transactions"""
+    """Liste ou crée des transactions"""
+
+    if request.method == 'POST':
+        data = request.data
+
+        portfolio_id = data.get('portfolio_id')
+        isin = data.get('isin', '').strip().upper()
+        date_transaction = data.get('date')
+        type_operation = data.get('type_operation', '').strip().upper()
+        quantite = data.get('quantite')
+        prix_unitaire = data.get('prix_unitaire')
+        devise = data.get('devise', 'EUR')
+
+        if not all([portfolio_id, isin, date_transaction, type_operation, quantite, prix_unitaire]):
+            return Response(
+                {'error': 'Champs obligatoires manquants: portfolio_id, isin, date, type_operation, quantite, prix_unitaire'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if type_operation not in ['ACHAT', 'VENTE']:
+            return Response({'error': "type_operation doit être ACHAT ou VENTE"}, status=status.HTTP_400_BAD_REQUEST)
+
+        portfolio = file_storage.get_portfolio_by_id(int(portfolio_id))
+        if not portfolio:
+            return Response({'error': 'Portefeuille non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            sig_dict = file_storage.get_signaletique_by_isin(isin)
+            if not sig_dict:
+                return Response({'error': f"ISIN {isin} introuvable dans la signalétique"}, status=status.HTTP_404_NOT_FOUND)
+            signaletique_id = sig_dict['id']
+        except Exception:
+            return Response({'error': f"ISIN {isin} introuvable dans la signalétique"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            quantite_decimal = Decimal(str(quantite))
+            prix_decimal = Decimal(str(prix_unitaire))
+        except Exception:
+            return Response({'error': 'quantite et prix_unitaire doivent être des nombres valides'}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction = file_storage.create_transaction(
+            int(portfolio_id),
+            signaletique_id,
+            date_transaction,
+            type_operation,
+            quantite_decimal,
+            prix_decimal,
+            devise,
+            isin=isin
+        )
+
+        return Response(transaction, status=status.HTTP_201_CREATED)
+
+    # GET
     portfolio_id = request.GET.get('portfolio_id')
-    
+
     if portfolio_id:
-        transactions = Transaction.objects.filter(portfolio_id=portfolio_id)
+        transactions = file_storage.get_transactions_by_portfolio(int(portfolio_id))
     else:
-        transactions = Transaction.objects.all()
-    
-    serializer = TransactionSerializer(transactions, many=True)
-    return Response(serializer.data)
+        transactions = file_storage.get_all_transactions()
+
+    # Enrichir les transactions avec les infos de signalétique
+    enriched_transactions = []
+    for transaction in transactions:
+        sig = file_storage.get_signaletique_for_transaction(transaction)
+        portfolio = file_storage.get_portfolio_by_id(transaction['portfolio_id'])
+
+        enriched_transaction = transaction.copy()
+        if sig:
+            enriched_transaction['signaletique'] = {
+                'id': sig['id'],
+                'code': sig.get('code', ''),
+                'isin': sig.get('isin', ''),
+                'titre': sig.get('titre', '')
+            }
+        if portfolio:
+            enriched_transaction['portfolio'] = {
+                'id': portfolio['id'],
+                'name': portfolio['name']
+            }
+
+        enriched_transactions.append(enriched_transaction)
+
+    return Response(enriched_transactions)
 
 
 @api_view(['DELETE'])
 def delete_transaction(request, pk):
     """Supprime une transaction"""
-    try:
-        transaction = Transaction.objects.get(pk=pk)
-    except Transaction.DoesNotExist:
+    if file_storage.delete_transaction(int(pk)):
         return Response(
-            {'error': 'Transaction non trouvée'},
-            status=status.HTTP_404_NOT_FOUND
+            {'success': True, 'message': 'Transaction supprimée'},
+            status=status.HTTP_204_NO_CONTENT
         )
     
-    transaction.delete()
     return Response(
-        {'success': True, 'message': 'Transaction supprimée'},
-        status=status.HTTP_204_NO_CONTENT
+        {'error': 'Transaction non trouvée'},
+        status=status.HTTP_404_NOT_FOUND
     )
 
 
@@ -816,18 +1702,19 @@ def get_prix_reel(prix_unitaire, categorie, type_instrument=''):
 @api_view(['GET'])
 def portfolio_fifo_analysis(request, pk):
     """Analyse FIFO d'un portefeuille : positions actuelles et P&L réalisé"""
-    try:
-        portfolio = RealPortfolio.objects.get(pk=pk)
-    except RealPortfolio.DoesNotExist:
+    portfolio = file_storage.get_portfolio_by_id(int(pk))
+    
+    if not portfolio:
         return Response(
             {'error': 'Portefeuille non trouvé'},
             status=status.HTTP_404_NOT_FOUND
         )
     
     # Récupérer toutes les transactions triées par date
-    transactions = Transaction.objects.filter(portfolio=portfolio).select_related(
-        'signaletique', 'signaletique__categorie'
-    ).order_by('date', 'id')
+    all_transactions = file_storage.get_transactions_by_portfolio(int(pk))
+    
+    # Trier les transactions par date et id
+    transactions_sorted = sorted(all_transactions, key=lambda x: (x['date'], x['id']))
     
     # Structure pour stocker les lots d'achat (FIFO)
     # positions[isin] = [(date, quantite, prix_unitaire), ...]
@@ -839,82 +1726,86 @@ def portfolio_fifo_analysis(request, pk):
     # Historique des transactions traitées
     transaction_details = []
     
-    for transaction in transactions:
-        isin = transaction.signaletique.isin or transaction.signaletique.code
-        titre = transaction.signaletique.titre
-        sig = transaction.signaletique
-        if sig.categorie:
-            categorie = sig.categorie.name
-        elif sig.categorie_text:
-            categorie = sig.categorie_text
-        else:
-            categorie = 'Non classé'
-        
+    for transaction in transactions_sorted:
+        # Récupérer la signalétique
+        sig = file_storage.get_signaletique_for_transaction(transaction)
+        if not sig:
+            continue
+
+        isin = sig.get('isin') or sig.get('code')
+        titre = sig.get('titre', '')
+        categorie = sig.get('categorie_text') or 'Non classé'
+
         # Extraire le type d'instrument depuis donnees_supplementaires
         type_instrument = ''
-        if sig.donnees_supplementaires and "Type d'instr" in sig.donnees_supplementaires:
-            type_instrument = sig.donnees_supplementaires["Type d'instr"] or ''
+        ds = sig.get('donnees_supplementaires') or {}
+        if "Type d'instr" in ds:
+            type_instrument = ds["Type d'instr"] or ''
         
-        if transaction.type_operation == 'ACHAT':
+        # Convertir les valeurs string en Decimal
+        quantite = Decimal(str(transaction['quantite']))
+        prix_unitaire = Decimal(str(transaction['prix_unitaire']))
+        
+        if transaction['type_operation'] == 'ACHAT':
             # Ajouter un lot d'achat
             if isin not in positions:
                 positions[isin] = {
                     'titre': titre,
                     'categorie': categorie,
                     'type_instrument': type_instrument,
-                    'signaletique_id': sig.id,
-                    'donnees_supplementaires': sig.donnees_supplementaires or {},
+                    'signaletique_id': sig['id'],
+                    'donnees_supplementaires': ds,
                     'lots': [],
                     'quantite_totale': Decimal('0')
                 }
             
             positions[isin]['lots'].append({
-                'date': transaction.date,
-                'quantite': transaction.quantite,
-                'prix_unitaire': transaction.prix_unitaire,
-                'devise': transaction.devise
+                'date': transaction['date'],
+                'quantite': quantite,
+                'prix_unitaire': prix_unitaire,
+                'devise': transaction['devise']
             })
-            positions[isin]['quantite_totale'] += transaction.quantite
+            positions[isin]['quantite_totale'] += quantite
             
             # Calculer le montant (pour obligations: prix en %, donc diviser par 100)
-            prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
-            montant = transaction.quantite * prix_reel
+            prix_reel = get_prix_reel(prix_unitaire, categorie, type_instrument)
+            montant = quantite * prix_reel
             
             transaction_details.append({
-                'id': transaction.id,
-                'date': transaction.date,
+                'id': transaction['id'],
+                'date': transaction['date'],
                 'type': 'ACHAT',
                 'titre': titre,
                 'categorie': categorie,
                 'type_instrument': type_instrument,
-                'quantite': float(transaction.quantite),
-                'prix_unitaire': float(transaction.prix_unitaire),
+                'quantite': float(quantite),
+                'prix_unitaire': float(prix_unitaire),
                 'montant': float(montant),
-                'devise': transaction.devise
+                'devise': transaction['devise']
             })
             
-        elif transaction.type_operation == 'VENTE':
+        elif transaction['type_operation'] == 'VENTE':
             # Consommer les lots d'achat en FIFO
-            if isin not in positions or positions[isin]['quantite_totale'] < transaction.quantite:
+            if isin not in positions or positions[isin]['quantite_totale'] < quantite:
                 # Vente à découvert ou erreur
-                prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
-                montant = transaction.quantite * prix_reel
+                prix_reel = get_prix_reel(prix_unitaire, categorie, type_instrument)
+                montant = quantite * prix_reel
                 
                 transaction_details.append({
-                    'id': transaction.id,
-                    'date': transaction.date,
+                    'id': transaction['id'],
+                    'date': transaction['date'],
                     'type': 'VENTE',
                     'titre': titre,
                     'categorie': categorie,
-                    'quantite': float(transaction.quantite),
-                    'prix_unitaire': float(transaction.prix_unitaire),
+                    'quantite': float(quantite),
+                    'prix_unitaire': float(prix_unitaire),
                     'montant': float(montant),
-                    'devise': transaction.devise,
+                    'devise': transaction['devise'],
                     'erreur': 'Vente sans achat correspondant'
                 })
                 continue
             
-            quantite_a_vendre = transaction.quantite
+            quantite_a_vendre = quantite
             pnl_transaction = Decimal('0')
             lots_consommes = []
             
@@ -925,7 +1816,7 @@ def portfolio_fifo_analysis(request, pk):
                     # Consommer tout le lot
                     quantite_vendue = lot['quantite']
                     # Pour obligations: prix en %, donc calculer avec prix réels
-                    prix_vente_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+                    prix_vente_reel = get_prix_reel(prix_unitaire, categorie, type_instrument)
                     prix_achat_reel = get_prix_reel(lot['prix_unitaire'], categorie, type_instrument)
                     pnl_lot = quantite_vendue * (prix_vente_reel - prix_achat_reel)
                     pnl_transaction += pnl_lot
@@ -933,7 +1824,7 @@ def portfolio_fifo_analysis(request, pk):
                     lots_consommes.append({
                         'quantite': float(quantite_vendue),
                         'prix_achat': float(lot['prix_unitaire']),
-                        'prix_vente': float(transaction.prix_unitaire),
+                        'prix_vente': float(prix_unitaire),
                         'pnl': float(pnl_lot)
                     })
                     
@@ -945,7 +1836,7 @@ def portfolio_fifo_analysis(request, pk):
                     # Consommer partiellement le lot
                     quantite_vendue = quantite_a_vendre
                     # Pour obligations: prix en %, donc calculer avec prix réels
-                    prix_vente_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
+                    prix_vente_reel = get_prix_reel(prix_unitaire, categorie, type_instrument)
                     prix_achat_reel = get_prix_reel(lot['prix_unitaire'], categorie, type_instrument)
                     pnl_lot = quantite_vendue * (prix_vente_reel - prix_achat_reel)
                     pnl_transaction += pnl_lot
@@ -953,7 +1844,7 @@ def portfolio_fifo_analysis(request, pk):
                     lots_consommes.append({
                         'quantite': float(quantite_vendue),
                         'prix_achat': float(lot['prix_unitaire']),
-                        'prix_vente': float(transaction.prix_unitaire),
+                        'prix_vente': float(prix_unitaire),
                         'pnl': float(pnl_lot)
                     })
                     
@@ -973,28 +1864,28 @@ def portfolio_fifo_analysis(request, pk):
             
             realized_pnl[isin]['pnl_total'] += pnl_transaction
             realized_pnl[isin]['ventes'].append({
-                'date': transaction.date,
-                'quantite': float(transaction.quantite),
-                'prix_vente': float(transaction.prix_unitaire),
+                'date': transaction['date'],
+                'quantite': float(quantite),
+                'prix_vente': float(prix_unitaire),
                 'pnl': float(pnl_transaction),
                 'lots_consommes': lots_consommes
             })
             
             # Calculer le montant (pour obligations: prix en %, donc diviser par 100)
-            prix_reel = get_prix_reel(transaction.prix_unitaire, categorie, type_instrument)
-            montant = transaction.quantite * prix_reel
+            prix_reel = get_prix_reel(prix_unitaire, categorie, type_instrument)
+            montant = quantite * prix_reel
             
             transaction_details.append({
-                'id': transaction.id,
-                'date': transaction.date,
+                'id': transaction['id'],
+                'date': transaction['date'],
                 'type': 'VENTE',
                 'titre': titre,
                 'categorie': categorie,
                 'type_instrument': type_instrument,
-                'quantite': float(transaction.quantite),
-                'prix_unitaire': float(transaction.prix_unitaire),
+                'quantite': float(quantite),
+                'prix_unitaire': float(prix_unitaire),
                 'montant': float(montant),
-                'devise': transaction.devise,
+                'devise': transaction['devise'],
                 'pnl': float(pnl_transaction),
                 'lots_consommes': lots_consommes
             })
@@ -1054,8 +1945,8 @@ def portfolio_fifo_analysis(request, pk):
     
     return Response({
         'portfolio': {
-            'id': portfolio.id,
-            'name': portfolio.name
+            'id': portfolio['id'],
+            'name': portfolio['name']
         },
         'positions_actuelles': positions_actuelles,
         'pnl_realise': {

@@ -40,6 +40,8 @@ services:
              python manage.py runserver 0.0.0.0:8001"
     volumes:
       - ./backend:/app
+      - ./data:/app/data
+      - ./Sauvegarde:/app/sauvegarde
       - portfolio_static_volume:/app/staticfiles
       - portfolio_media_volume:/app/media
     ports:

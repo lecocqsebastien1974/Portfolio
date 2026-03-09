@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 
 username = 'seblec'
 email = 'seblec@example.com'  # À modifier si nécessaire
-password = 'Temp2026!'  # Mot de passe temporaire à changer
+password = 'seblec123!'  # Mot de passe
 
 try:
     user = User.objects.get(username=username)

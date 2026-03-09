@@ -20,6 +20,11 @@ function Simulation() {
   const [editingId, setEditingId] = useState(null);
   const [activeRowId, setActiveRowId] = useState(null);
 
+  // Import Excel portefeuille cible
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+
   const normalizeKey = (value) => String(value)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -304,6 +309,45 @@ function Simulation() {
     setStatusMessage(null);
   };
 
+  const handleImportTargetPortfolio = async () => {
+    if (!importFile) {
+      setImportMessage('⚠️ Veuillez sélectionner un fichier');
+      return;
+    }
+    setImporting(true);
+    setImportMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const response = await fetch(`${API_URL}/api/import/target-portfolio/`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        let msg = `✅ Import terminé ! ${data.details.portefeuilles_crees} portefeuille(s) créé(s)/mis à jour`;
+        if (data.details.erreurs > 0) msg += ` — ⚠️ ${data.details.erreurs} erreur(s)`;
+        if (data.details.liste_erreurs?.length) {
+          msg += '\n' + data.details.liste_erreurs.map(e => `Ligne ${e.ligne}: ${e.erreur}`).join('\n');
+        }
+        setImportMessage(msg);
+        setImportFile(null);
+        const inp = document.getElementById('target-import-file');
+        if (inp) inp.value = '';
+        fetchPortfolios();
+        setTimeout(() => setImportMessage(''), 6000);
+      } else {
+        setImportMessage(`❌ ${data.error || 'Erreur lors de l\'import'}`);
+        setTimeout(() => setImportMessage(''), 6000);
+      }
+    } catch (error) {
+      setImportMessage(`❌ Erreur: ${error.message}`);
+      setTimeout(() => setImportMessage(''), 6000);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="App">
       <div className="language-selector">
@@ -536,6 +580,42 @@ function Simulation() {
               );
             })}
           </div>
+        </div>
+
+        <div className="simulation-card">
+          <div className="simulation-header">
+            <h2>📥 Importer un portefeuille cible depuis Excel</h2>
+          </div>
+          <p style={{fontSize: '14px', color: '#aaa', marginBottom: '15px'}}>
+            Format attendu : colonnes <strong>Portefeuille</strong>, <strong>Titre</strong> (nom, ISIN ou code), <strong>Ratio</strong> (%).<br/>
+            Plusieurs lignes avec le même nom de portefeuille seront regroupées.<br/>
+            Si le portefeuille cible existe déjà, il sera mis à jour.
+          </p>
+          <div className="file-input-wrapper">
+            <input
+              type="file"
+              id="target-import-file"
+              onChange={(e) => { setImportFile(e.target.files[0]); setImportMessage(''); }}
+              accept=".xlsx,.xls"
+              disabled={importing}
+            />
+            <label htmlFor="target-import-file" className="file-input-label">
+              {importFile ? `📄 ${importFile.name}` : '📁 Choisir un fichier Excel'}
+            </label>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleImportTargetPortfolio}
+            disabled={!importFile || importing}
+            style={{marginTop: '10px'}}
+          >
+            {importing ? '⏳ Import en cours...' : '📤 Importer'}
+          </button>
+          {importMessage && (
+            <div className={`message ${importMessage.includes('✅') ? 'success' : 'error'}`} style={{marginTop: '15px', whiteSpace: 'pre-line'}}>
+              {importMessage}
+            </div>
+          )}
         </div>
       </header>
     </div>

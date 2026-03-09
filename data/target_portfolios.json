@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "name": "port cible1",
+    "date_creation": "2026-03-09T14:31:19.767676",
+    "date_modification": "2026-03-09T14:31:19.767684",
+    "items": [
+      {
+        "id": 1,
+        "signaletique": 33,
+        "ratio": "100.0"
+      }
+    ]
+  }
+]

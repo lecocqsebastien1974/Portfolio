@@ -10,7 +10,26 @@ function Portfolios() {
   const [file, setFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
+
+  // États pour l'import cash Excel
+  const [cashImportFile, setCashImportFile] = useState(null);
+  const [cashImporting, setCashImporting] = useState(false);
+  const [cashImportMessage, setCashImportMessage] = useState('');
   
+  // États pour la saisie manuelle d'opération
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [transactionForm, setTransactionForm] = useState({
+    portfolio_id: '',
+    type_operation: 'ACHAT',
+    isin: '',
+    date: new Date().toISOString().split('T')[0],
+    quantite: '',
+    prix_unitaire: '',
+    devise: 'EUR'
+  });
+  const [transactionMessage, setTransactionMessage] = useState('');
+  const [savingTransaction, setSavingTransaction] = useState(false);
+
   // États pour la gestion du cash
   const [cashEntries, setCashEntries] = useState([]);
   const [showCashForm, setShowCashForm] = useState(false);
@@ -60,6 +79,66 @@ function Portfolios() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleTransactionFormChange = (e) => {
+    const { name, value } = e.target;
+    setTransactionForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    const { portfolio_id, type_operation, isin, date, quantite, prix_unitaire, devise } = transactionForm;
+
+    if (!portfolio_id || !isin || !date || !quantite || !prix_unitaire) {
+      setTransactionMessage('⚠️ Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    setSavingTransaction(true);
+    setTransactionMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/transactions/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          portfolio_id: parseInt(portfolio_id),
+          type_operation,
+          isin: isin.trim().toUpperCase(),
+          date,
+          quantite,
+          prix_unitaire,
+          devise
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTransactionMessage('✅ Opération ajoutée avec succès');
+        setTransactionForm({
+          portfolio_id: '',
+          type_operation: 'ACHAT',
+          isin: '',
+          date: new Date().toISOString().split('T')[0],
+          quantite: '',
+          prix_unitaire: '',
+          devise: 'EUR'
+        });
+        setShowTransactionForm(false);
+        fetchPortfolios();
+        setTimeout(() => setTransactionMessage(''), 4000);
+      } else {
+        setTransactionMessage(`❌ ${data.error || 'Erreur lors de la création'}`);
+        setTimeout(() => setTransactionMessage(''), 6000);
+      }
+    } catch (error) {
+      setTransactionMessage(`❌ Erreur: ${error.message}`);
+      setTimeout(() => setTransactionMessage(''), 6000);
+    } finally {
+      setSavingTransaction(false);
+    }
   };
 
   const handleAddCash = async (e) => {
@@ -236,6 +315,46 @@ function Portfolios() {
     }
   };
 
+  const handleCashImport = async () => {
+    if (!cashImportFile) {
+      setCashImportMessage('⚠️ Veuillez sélectionner un fichier');
+      return;
+    }
+    setCashImporting(true);
+    setCashImportMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', cashImportFile);
+      const response = await fetch(`${apiBaseUrl}/api/import/cash/`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        let msg = `✅ Import terminé ! ${data.details.succes} entrée(s) importée(s)`;
+        if (data.details.erreurs > 0) msg += ` — ⚠️ ${data.details.erreurs} erreur(s)`;
+        if (data.details.liste_erreurs?.length) {
+          msg += '\n' + data.details.liste_erreurs.map(e => `Ligne ${e.ligne}: ${e.erreur}`).join('\n');
+        }
+        setCashImportMessage(msg);
+        setCashImportFile(null);
+        const inp = document.getElementById('cash-import-file');
+        if (inp) inp.value = '';
+        fetchCashEntries();
+        fetchPortfolios();
+        setTimeout(() => setCashImportMessage(''), 6000);
+      } else {
+        setCashImportMessage(`❌ ${data.error || 'Erreur lors de l\'import'}`);
+        setTimeout(() => setCashImportMessage(''), 6000);
+      }
+    } catch (error) {
+      setCashImportMessage(`❌ Erreur: ${error.message}`);
+      setTimeout(() => setCashImportMessage(''), 6000);
+    } finally {
+      setCashImporting(false);
+    }
+  };
+
   const handleDeletePortfolio = async (portfolioId, portfolioName) => {
     const confirmation = window.confirm(`Vous allez supprimer un portefeuille. En êtes-vous certain?`);
     
@@ -340,8 +459,137 @@ function Portfolios() {
         </div>
 
         <div className="cash-container" style={{marginTop: '40px', borderTop: '2px solid #444', paddingTop: '30px'}}>
+          <h2>✏️ Saisie manuelle d'une opération</h2>
+          <p>Ajoutez une transaction directement sans passer par un fichier Excel</p>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowTransactionForm(!showTransactionForm)}
+            style={{marginBottom: '20px'}}
+          >
+            {showTransactionForm ? '❌ Annuler' : '➕ Ajouter une opération'}
+          </button>
+
+          {showTransactionForm && (
+            <form onSubmit={handleAddTransaction} style={{
+              backgroundColor: '#1a1a1a',
+              padding: '20px',
+              borderRadius: '10px',
+              marginBottom: '20px'
+            }}>
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Portefeuille *</label>
+                <select name="portfolio_id" value={transactionForm.portfolio_id} onChange={handleTransactionFormChange} required
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}}>
+                  <option value="">-- Sélectionner un portefeuille --</option>
+                  {portfolios.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Type d'opération *</label>
+                <select name="type_operation" value={transactionForm.type_operation} onChange={handleTransactionFormChange} required
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}}>
+                  <option value="ACHAT">ACHAT</option>
+                  <option value="VENTE">VENTE</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>ISIN * <span style={{fontSize: '12px', color: '#aaa'}}>(12 caractères, ex: FR0010315770)</span></label>
+                <input type="text" name="isin" value={transactionForm.isin} onChange={handleTransactionFormChange}
+                  required maxLength={12} placeholder="FR0010315770"
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px', textTransform: 'uppercase'}} />
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Date *</label>
+                <input type="date" name="date" value={transactionForm.date} onChange={handleTransactionFormChange} required
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}} />
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Quantité *</label>
+                <input type="number" name="quantite" value={transactionForm.quantite} onChange={handleTransactionFormChange}
+                  required step="any" min="0" placeholder="100"
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}} />
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Prix unitaire *</label>
+                <input type="number" name="prix_unitaire" value={transactionForm.prix_unitaire} onChange={handleTransactionFormChange}
+                  required step="any" min="0" placeholder="50.25"
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}} />
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Devise *</label>
+                <select name="devise" value={transactionForm.devise} onChange={handleTransactionFormChange} required
+                  style={{width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px'}}>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="USD">USD - Dollar américain</option>
+                  <option value="GBP">GBP - Livre sterling</option>
+                  <option value="CHF">CHF - Franc suisse</option>
+                  <option value="JPY">JPY - Yen japonais</option>
+                  <option value="CAD">CAD - Dollar canadien</option>
+                  <option value="AUD">AUD - Dollar australien</option>
+                  <option value="SEK">SEK - Couronne suédoise</option>
+                  <option value="NOK">NOK - Couronne norvégienne</option>
+                  <option value="DKK">DKK - Couronne danoise</option>
+                </select>
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={savingTransaction}>
+                {savingTransaction ? '⏳ Enregistrement...' : '💾 Enregistrer l\'opération'}
+              </button>
+            </form>
+          )}
+
+          {transactionMessage && (
+            <div className={`message ${transactionMessage.includes('✅') ? 'success' : 'error'}`} style={{marginTop: '10px'}}>
+              {transactionMessage}
+            </div>
+          )}
+        </div>
+
+        <div className="cash-container" style={{marginTop: '40px', borderTop: '2px solid #444', paddingTop: '30px'}}>
           <h2>💰 Gestion du Cash</h2>
           <p>Gérez vos soldes de cash par portefeuille et banque</p>
+
+          {/* Import Excel cash */}
+          <div style={{backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '10px', marginBottom: '30px'}}>
+            <h3>📥 Importer depuis Excel</h3>
+            <p style={{fontSize: '14px', color: '#aaa', marginBottom: '10px'}}>
+              Format attendu : <strong>Portefeuille, Banque, Montant, Devise, Date, Commentaire</strong>
+            </p>
+            <div className="file-input-wrapper">
+              <input
+                type="file"
+                id="cash-import-file"
+                onChange={(e) => { setCashImportFile(e.target.files[0]); setCashImportMessage(''); }}
+                accept=".xlsx,.xls"
+                disabled={cashImporting}
+              />
+              <label htmlFor="cash-import-file" className="file-input-label">
+                {cashImportFile ? `📄 ${cashImportFile.name}` : '📁 Choisir un fichier Excel'}
+              </label>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleCashImport}
+              disabled={!cashImportFile || cashImporting}
+              style={{marginTop: '10px'}}
+            >
+              {cashImporting ? '⏳ Import en cours...' : '📤 Importer le cash'}
+            </button>
+            {cashImportMessage && (
+              <div className={`message ${cashImportMessage.includes('✅') ? 'success' : 'error'}`} style={{marginTop: '10px', whiteSpace: 'pre-line'}}>
+                {cashImportMessage}
+              </div>
+            )}
+          </div>
 
           <button 
             className="btn btn-primary"

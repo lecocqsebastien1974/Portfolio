@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "portfolio_id": 1,
+    "banque": "XYZ",
+    "montant": "2000",
+    "devise": "AUD",
+    "date": "2026-03-09",
+    "commentaire": null,
+    "date_creation": "2026-03-09T14:31:19.749620",
+    "date_modification": "2026-03-09T14:31:19.749624"
+  }
+]

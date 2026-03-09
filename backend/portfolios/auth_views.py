@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -64,6 +65,88 @@ def current_user(request):
         'is_staff': user.is_staff,
         'is_superuser': user.is_superuser
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def import_users(request):
+    """Restaure les utilisateurs depuis un fichier Excel de sauvegarde.
+    Colonnes attendues : username, email, first_name, last_name,
+                         is_staff, is_superuser, is_active, password_hash
+    Seul un superuser peut utiliser cet endpoint.
+    """
+    if not request.user.is_superuser:
+        return Response({'error': 'Réservé aux superusers'}, status=status.HTTP_403_FORBIDDEN)
+
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+
+    file = request.FILES['file']
+    if not file.name.endswith(('.xlsx', '.xls')):
+        return Response({'error': 'Format non supporté. Utilisez .xlsx ou .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+    import openpyxl
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        headers = [str(c.value).strip() if c.value else '' for c in ws[1]]
+
+        crees = 0
+        mis_a_jour = 0
+        erreurs = []
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            row_data = {h: v for h, v in zip(headers, row)}
+            username = str(row_data.get('username') or '').strip()
+            if not username:
+                continue
+
+            password_hash = str(row_data.get('password_hash') or '').strip()
+            if not password_hash:
+                erreurs.append({'ligne': row_idx, 'erreur': 'password_hash manquant pour %s' % username})
+                continue
+
+            try:
+                user, created = User.objects.get_or_create(
+                    username=username,
+                    defaults={
+                        'email': str(row_data.get('email') or ''),
+                        'first_name': str(row_data.get('first_name') or ''),
+                        'last_name': str(row_data.get('last_name') or ''),
+                        'is_staff': bool(row_data.get('is_staff')),
+                        'is_superuser': bool(row_data.get('is_superuser')),
+                        'is_active': row_data.get('is_active') != False,
+                    }
+                )
+                # Restaurer le hash directement (sans re-hachage)
+                user.password = password_hash
+                if not created:
+                    user.email = str(row_data.get('email') or '')
+                    user.first_name = str(row_data.get('first_name') or '')
+                    user.last_name = str(row_data.get('last_name') or '')
+                    user.is_staff = bool(row_data.get('is_staff'))
+                    user.is_superuser = bool(row_data.get('is_superuser'))
+                    user.is_active = row_data.get('is_active') != False
+                user.save()
+                if created:
+                    crees += 1
+                else:
+                    mis_a_jour += 1
+            except Exception as e:
+                erreurs.append({'ligne': row_idx, 'erreur': str(e)})
+
+        return Response({
+            'success': True,
+            'details': {
+                'crees': crees,
+                'mis_a_jour': mis_a_jour,
+                'erreurs': len(erreurs),
+                'liste_erreurs': erreurs[:10]
+            }
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

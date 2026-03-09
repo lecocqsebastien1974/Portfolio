@@ -16,6 +16,9 @@ function AdminPanel() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [userImportFile, setUserImportFile] = useState(null);
+  const [userImportMessage, setUserImportMessage] = useState('');
 
   // Formulaire utilisateur
   const [userForm, setUserForm] = useState({
@@ -290,15 +293,59 @@ function AdminPanel() {
       <div className="users-section">
         <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Gestion des utilisateurs</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={handleOpenCategories}>
               📁 Catégories d'actifs
             </button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <span className="btn btn-secondary" style={{ margin: 0 }}>📥 Restaurer depuis Excel</span>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={e => setUserImportFile(e.target.files[0])}
+              />
+            </label>
+            {userImportFile && (
+              <button
+                className="btn btn-warning"
+                onClick={async () => {
+                  const formData = new FormData();
+                  formData.append('file', userImportFile);
+                  try {
+                    const r = await fetch('http://localhost:8001/api/import/users/', {
+                      method: 'POST',
+                      credentials: 'include',
+                      body: formData
+                    });
+                    const d = await r.json();
+                    if (r.ok && d.success) {
+                      const det = d.details;
+                      setUserImportMessage(`✅ ${det.crees} créé(s), ${det.mis_a_jour} mis à jour${det.erreurs ? ', ⚠️ ' + det.erreurs + ' erreur(s)' : ''}`);
+                    } else {
+                      setUserImportMessage('❌ ' + (d.error || JSON.stringify(d)));
+                    }
+                  } catch (e) {
+                    setUserImportMessage('❌ Erreur: ' + e.message);
+                  }
+                  setUserImportFile(null);
+                  fetchUsers();
+                }}
+              >
+                Importer "{userImportFile.name}"
+              </button>
+            )}
             <button className="btn btn-primary" onClick={openAddUserModal}>
               + Nouvel utilisateur
             </button>
           </div>
         </div>
+        {userImportMessage && (
+          <div style={{ marginBottom: '10px', padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bee3f8', borderRadius: '4px', color: '#2c5282' }}>
+            {userImportMessage}
+            <button onClick={() => setUserImportMessage('')} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button>
+          </div>
+        )}
 
         {loading ? (
           <div>Chargement...</div>
@@ -442,13 +489,43 @@ function AdminPanel() {
               </div>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Mot de passe {editingUser && '(laisser vide pour ne pas changer)'}</label>
-                <input
-                  type="password"
-                  value={userForm.password}
-                  onChange={e => setUserForm({ ...userForm, password: e.target.value })}
-                  required={!editingUser}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={userForm.password}
+                    onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                    required={!editingUser}
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px', 
+                      paddingRight: '40px',
+                      border: '1px solid #ddd', 
+                      borderRadius: '4px' 
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '18px',
+                      padding: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#666'
+                    }}
+                    title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
               </div>
               <div style={{ marginBottom: '15px', display: 'flex', gap: '20px' }}>
                 <label style={{ color: '#333' }}>
