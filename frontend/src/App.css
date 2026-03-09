@@ -1246,6 +1246,237 @@ button:disabled {
   margin-top: 2rem;
 }
 
+.detail-row-prix {
+  background: rgba(255, 200, 50, 0.08);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+/* ── Import source Koala ── */
+.btn-koala {
+  background: linear-gradient(135deg, #7B9E87, #4a7c59);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.btn-koala:hover {
+  background: linear-gradient(135deg, #4a7c59, #2e5e3a);
+}
+
+.koala-panel {
+  background: rgba(74, 124, 89, 0.12);
+  border: 1px solid rgba(74, 124, 89, 0.35);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin: 1rem 0;
+  width: 100%;
+  max-width: 900px;
+  text-align: left;
+}
+.koala-panel h3 {
+  margin: 0 0 0.5rem;
+  color: #7B9E87;
+}
+.koala-desc {
+  font-size: 0.88rem;
+  opacity: 0.75;
+  margin-bottom: 1rem;
+}
+.koala-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.koala-history {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+.koala-history h4 {
+  margin-bottom: 0.5rem;
+  color: #7B9E87;
+}
+.koala-history-table {
+  font-size: 0.88rem;
+}
+
+.btn-bonobo {
+  background: linear-gradient(135deg, #9B7EC8, #6a4fa0);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.btn-bonobo:hover {
+  background: linear-gradient(135deg, #6a4fa0, #4a2e80);
+}
+
+.bonobo-panel {
+  background: rgba(107, 79, 160, 0.12) !important;
+  border-color: rgba(107, 79, 160, 0.35) !important;
+}
+.bonobo-panel h3 {
+  color: #9B7EC8 !important;
+}
+.bonobo-panel .koala-history h4 {
+  color: #9B7EC8 !important;
+}
+
+/* ── Consolidation des prix ── */
+.btn-consolidate {
+  background: linear-gradient(135deg, #2E9E6A, #1a7a50);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.btn-consolidate:hover {
+  background: linear-gradient(135deg, #1a7a50, #0f5a38);
+}
+.btn-consolidate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-import-prix {
+  background: linear-gradient(135deg, #e67e22, #c0392b);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.btn-import-prix:hover {
+  background: linear-gradient(135deg, #c0392b, #922b21);
+}
+.btn-import-prix:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.consolidate-msg {
+  margin: 6px 0 0 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+/* ── Historique des cours dans le panneau détail ── */
+.btn-history {
+  background: linear-gradient(135deg, #3a8fd4, #1e6aaa);
+  color: #fff;
+  border: none;
+  padding: 5px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.btn-history:hover {
+  background: linear-gradient(135deg, #1e6aaa, #0e4a7a);
+}
+
+.titre-history-section {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+
+.titre-history-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.7rem 0;
+  color: #3a8fd4;
+}
+
+.titre-history-table {
+  font-size: 0.82rem;
+  width: 100%;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.source-koala  { background: rgba(91,164,87,0.25);  color: #5baa57; }
+.source-bonobo { background: rgba(155,126,200,0.25); color: #9B7EC8; }
+
+.no-history-msg {
+  font-size: 0.85rem;
+  opacity: 0.65;
+  font-style: italic;
+  margin: 0.4rem 0;
+}
+
+.loading-small {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.detail-sub {
+  font-size: 0.82em;
+  opacity: 0.75;
+  margin-left: 6px;
+}
+
+.source-prix {
+  font-style: italic;
+}
+
+/* Portfolio characteristics tab */
+.portfolio-characteristics {
+  max-width: 600px;
+}
+
+.characteristics-color-bar {
+  height: 8px;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.characteristics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.characteristics-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  width: 200px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.characteristics-table td {
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.characteristics-table tr:last-child th,
+.characteristics-table tr:last-child td {
+  border-bottom: none;
+}
+
 .table-container {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;

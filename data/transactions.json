@@ -286,5 +286,17 @@
     "prix_unitaire": "4.99",
     "devise": "EUR",
     "date_creation": "2026-03-09T14:31:19.734620"
+  },
+  {
+    "id": 25,
+    "portfolio_id": 2,
+    "signaletique_id": 12,
+    "isin": "IE00BMWXKN31",
+    "date": "2026-03-09",
+    "type_operation": "ACHAT",
+    "quantite": "100",
+    "prix_unitaire": "50.25",
+    "devise": "EUR",
+    "date_creation": "2026-03-09T15:16:59.380915"
   }
 ]

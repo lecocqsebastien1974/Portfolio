@@ -33,6 +33,20 @@ function Portfolios() {
   // États pour la gestion du cash
   const [cashEntries, setCashEntries] = useState([]);
   const [showCashForm, setShowCashForm] = useState(false);
+
+  // États pour la création d'un portefeuille
+  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
+  const [portfolioForm, setPortfolioForm] = useState({
+    name: '',
+    description: '',
+    type_compte: '',
+    courtier: '',
+    devise: 'EUR',
+    date_ouverture: '',
+    couleur: '#2E4057',
+  });
+  const [portfolioMessage, setPortfolioMessage] = useState('');
+  const [savingPortfolio, setSavingPortfolio] = useState(false);
   const [cashForm, setCashForm] = useState({
     portfolio: '',
     banque: '',
@@ -369,13 +383,58 @@ function Portfolios() {
 
       if (response.ok || response.status === 204) {
         setMessage(`✅ Portefeuille "${portfolioName}" supprimé avec succès`);
-        // Rafraîchir la liste
         fetchPortfolios();
       } else {
         setMessage(`❌ Erreur lors de la suppression`);
       }
     } catch (error) {
       setMessage(`❌ Erreur: ${error.message}`);
+    }
+  };
+
+  const handlePortfolioFormChange = (e) => {
+    const { name, value } = e.target;
+    setPortfolioForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreatePortfolio = async (e) => {
+    e.preventDefault();
+    if (!portfolioForm.name.trim()) {
+      setPortfolioMessage('⚠️ Le nom du portefeuille est obligatoire');
+      return;
+    }
+    setSavingPortfolio(true);
+    setPortfolioMessage('');
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/real-portfolios/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: portfolioForm.name.trim(),
+          description: portfolioForm.description || null,
+          type_compte: portfolioForm.type_compte || null,
+          courtier: portfolioForm.courtier || null,
+          devise: portfolioForm.devise || 'EUR',
+          date_ouverture: portfolioForm.date_ouverture || null,
+          couleur: portfolioForm.couleur || null,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPortfolioMessage(`✅ Portefeuille "${data.name}" créé avec succès`);
+        setPortfolioForm({ name: '', description: '', type_compte: '', courtier: '', devise: 'EUR', date_ouverture: '', couleur: '#2E4057' });
+        setShowPortfolioForm(false);
+        fetchPortfolios();
+        setTimeout(() => setPortfolioMessage(''), 4000);
+      } else {
+        setPortfolioMessage(`❌ ${data.error || 'Erreur lors de la création'}`);
+        setTimeout(() => setPortfolioMessage(''), 6000);
+      }
+    } catch (error) {
+      setPortfolioMessage(`❌ Erreur: ${error.message}`);
+      setTimeout(() => setPortfolioMessage(''), 6000);
+    } finally {
+      setSavingPortfolio(false);
     }
   };
 
@@ -391,29 +450,130 @@ function Portfolios() {
         
         <div className="portfolios-list">
           <h2>📋 Mes Portefeuilles</h2>
+
+          {/* Bouton + formulaire de création */}
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowPortfolioForm(!showPortfolioForm)}
+            style={{ marginBottom: '20px' }}
+          >
+            {showPortfolioForm ? '❌ Annuler' : '➕ Créer un portefeuille'}
+          </button>
+
+          {portfolioMessage && (
+            <div className={`message ${portfolioMessage.includes('✅') ? 'success' : 'error'}`} style={{ marginBottom: '15px' }}>
+              {portfolioMessage}
+            </div>
+          )}
+
+          {showPortfolioForm && (
+            <form onSubmit={handleCreatePortfolio} style={{ backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '10px', marginBottom: '25px', textAlign: 'left' }}>
+              <h3 style={{ marginTop: 0 }}>Nouveau portefeuille</h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div className="form-group">
+                  <label>Nom *</label>
+                  <input type="text" name="name" value={portfolioForm.name} onChange={handlePortfolioFormChange}
+                    required placeholder="ex: PEA Boursorama"
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px', boxSizing: 'border-box' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Type de compte</label>
+                  <select name="type_compte" value={portfolioForm.type_compte} onChange={handlePortfolioFormChange}
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px' }}>
+                    <option value="">-- Choisir --</option>
+                    <option value="PEA">PEA</option>
+                    <option value="CTO">CTO</option>
+                    <option value="Assurance-vie">Assurance-vie</option>
+                    <option value="PER">PER</option>
+                    <option value="PEA-PME">PEA-PME</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Courtier / Banque</label>
+                  <input type="text" name="courtier" value={portfolioForm.courtier} onChange={handlePortfolioFormChange}
+                    placeholder="ex: Boursorama, Degiro, Saxo…"
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px', boxSizing: 'border-box' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Devise de référence</label>
+                  <select name="devise" value={portfolioForm.devise} onChange={handlePortfolioFormChange}
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px' }}>
+                    <option value="EUR">EUR — Euro</option>
+                    <option value="USD">USD — Dollar américain</option>
+                    <option value="GBP">GBP — Livre sterling</option>
+                    <option value="CHF">CHF — Franc suisse</option>
+                    <option value="JPY">JPY — Yen japonais</option>
+                    <option value="CAD">CAD — Dollar canadien</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Date d'ouverture</label>
+                  <input type="date" name="date_ouverture" value={portfolioForm.date_ouverture} onChange={handlePortfolioFormChange}
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Couleur d'affichage</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
+                    <input type="color" name="couleur" value={portfolioForm.couleur} onChange={handlePortfolioFormChange}
+                      style={{ width: '50px', height: '36px', borderRadius: '5px', border: 'none', cursor: 'pointer' }} />
+                    <span style={{ color: '#aaa', fontSize: '13px' }}>{portfolioForm.couleur}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '15px' }}>
+                <label>Description</label>
+                <textarea name="description" value={portfolioForm.description} onChange={handlePortfolioFormChange}
+                  placeholder="Description optionnelle du portefeuille…" rows="2"
+                  style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px', boxSizing: 'border-box' }} />
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={savingPortfolio} style={{ marginTop: '10px' }}>
+                {savingPortfolio ? '⏳ Création en cours...' : '💾 Créer le portefeuille'}
+              </button>
+            </form>
+          )}
           
           {loading ? (
             <p>Chargement...</p>
           ) : portfolios.length === 0 ? (
-            <p>Aucun portefeuille. Importez des transactions pour commencer.</p>
+            <p>Aucun portefeuille. Créez-en un ou importez des transactions pour commencer.</p>
           ) : (
             <div className="portfolio-cards">
               {portfolios.map(portfolio => (
-                <div key={portfolio.id} className="portfolio-card">
+                <div key={portfolio.id} className="portfolio-card" style={{ borderTop: portfolio.couleur ? `4px solid ${portfolio.couleur}` : undefined }}>
                   <h3>{portfolio.name}</h3>
+                  {(portfolio.type_compte || portfolio.courtier) && (
+                    <p style={{ color: '#aaa', fontSize: '13px', margin: '4px 0 8px' }}>
+                      {[portfolio.type_compte, portfolio.courtier].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                  {portfolio.description && (
+                    <p style={{ fontSize: '13px', margin: '4px 0 8px', fontStyle: 'italic' }}>{portfolio.description}</p>
+                  )}
                   <div className="portfolio-stats">
                     <span className="stat">
                       📊 {portfolio.transactions?.length || 0} transaction(s)
                     </span>
+                    {portfolio.devise && portfolio.devise !== 'EUR' && (
+                      <span className="stat" style={{ marginLeft: '10px' }}>💱 {portfolio.devise}</span>
+                    )}
                   </div>
                   <div className="portfolio-actions-vertical">
-                    <button 
+                    <button
                       className="btn btn-secondary"
                       onClick={() => window.location.href = `/portfolios/${portfolio.id}`}
                     >
                       Voir détails
                     </button>
-                    <button 
+                    <button
                       className="btn btn-danger"
                       onClick={() => handleDeletePortfolio(portfolio.id, portfolio.name)}
                     >

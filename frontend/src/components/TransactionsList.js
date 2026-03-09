@@ -139,6 +139,12 @@ function TransactionsList() {
           >
             💰 P&L Détaillé
           </button>
+          <button
+            className={`tab ${activeTab === 'caracteristiques' ? 'active' : ''}`}
+            onClick={() => setActiveTab('caracteristiques')}
+          >
+            ⚙️ Caractéristiques
+          </button>
         </div>
 
         {/* Contenu des onglets */}
@@ -343,6 +349,58 @@ function TransactionsList() {
                   </div>
                 ))
               )}
+            </div>
+          )}
+          {activeTab === 'caracteristiques' && (
+            <div className="table-container">
+              <h2>⚙️ Caractéristiques du portefeuille</h2>
+              <div className="portfolio-characteristics">
+                {analysis.portfolio.couleur && (
+                  <div className="characteristics-color-bar" style={{ backgroundColor: analysis.portfolio.couleur }} />
+                )}
+                <table className="characteristics-table">
+                  <tbody>
+                    <tr>
+                      <th>Nom</th>
+                      <td>{analysis.portfolio.name}</td>
+                    </tr>
+                    {analysis.portfolio.type_compte && (
+                      <tr>
+                        <th>Type de compte</th>
+                        <td>{analysis.portfolio.type_compte}</td>
+                      </tr>
+                    )}
+                    {analysis.portfolio.courtier && (
+                      <tr>
+                        <th>Courtier / Banque</th>
+                        <td>{analysis.portfolio.courtier}</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <th>Devise</th>
+                      <td>{analysis.portfolio.devise || 'EUR'}</td>
+                    </tr>
+                    {analysis.portfolio.date_ouverture && (
+                      <tr>
+                        <th>Date d'ouverture</th>
+                        <td>{new Date(analysis.portfolio.date_ouverture).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                    )}
+                    {analysis.portfolio.description && (
+                      <tr>
+                        <th>Description</th>
+                        <td>{analysis.portfolio.description}</td>
+                      </tr>
+                    )}
+                    {analysis.portfolio.date_creation && (
+                      <tr>
+                        <th>Créé le</th>
+                        <td>{new Date(analysis.portfolio.date_creation).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

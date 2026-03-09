@@ -309,6 +309,307 @@ def export_signaletique_csv(request):
     return response
 
 
+# ---------------------------------------------------------------------------
+# Import source Koala – colonnes D (Symbole) et H (Cours) uniquement
+# ---------------------------------------------------------------------------
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def import_koala(request):
+    """
+    Import source Koala : lit uniquement la colonne D (Symbole) et H (Cours)
+    de la feuille active (Positions) d'un fichier .xlsx.
+    Stocke l'historique dans /app/data/prix_historique_koala.json.
+    Rien n'est écrit en base de données ni dans un autre fichier JSON.
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+
+    uploaded = request.FILES['file']
+    if not uploaded.name.lower().endswith(('.xlsx', '.xls')):
+        return Response({'error': 'Format non supporté. Utilisez .xlsx ou .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        wb = openpyxl.load_workbook(uploaded, data_only=True)
+        # On lit la première feuille (Positions)
+        ws = wb.active
+
+        date_import = date.today().isoformat()
+        rows_to_add = []
+        ignores = 0
+
+        for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # col D = index 3, col H = index 7
+            symbole = row[3] if len(row) > 3 else None
+            cours = row[7] if len(row) > 7 else None
+
+            if symbole is None or cours is None:
+                ignores += 1
+                continue
+
+            symbole_str = str(symbole).strip()
+            if not symbole_str:
+                ignores += 1
+                continue
+
+            try:
+                cours_float = float(cours)
+            except (TypeError, ValueError):
+                ignores += 1
+                continue
+
+            rows_to_add.append({
+                'symbole': symbole_str,
+                'cours': cours_float,
+                'date_import': date_import,
+                'devise': 'EUR',
+            })
+
+        stats = file_storage.append_prix_koala(rows_to_add)
+
+        return Response({
+            'success': True,
+            'message': f"Import source Koala terminé : {stats['ajoutes']} cours importés",
+            'details': {
+                'fichier': uploaded.name,
+                'date_import': date_import,
+                'ajoutes': stats['ajoutes'],
+                'ignores': stats['ignores'] + ignores,
+                'identifiants': sorted({r['symbole'] for r in rows_to_add}),
+            }
+        })
+
+    except Exception as e:
+        return Response({'error': f"Erreur lors de l'import Koala : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def get_koala_history(request):
+    """Retourne l'historique complet des cours Koala (GET /api/import/koala/history/)"""
+    historique = file_storage.get_prix_historique_koala()
+    return Response(historique)
+
+
+# ---------------------------------------------------------------------------
+# Import source Bonobo – CSV ; – col 3 (ISIN), col 5 (Cours), col 6 (Devise)
+# ---------------------------------------------------------------------------
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def import_bonobo(request):
+    """
+    Import source Bonobo : lit un CSV délimité par ';'.
+    Colonnes retenues uniquement :
+      - col 3 (index 2) : Code ISIN  → identifiant
+      - col 5 (index 4) : Cours      → prix (virgule décimale acceptée)
+      - col 6 (index 5) : Dev.       → devise (peut être '%')
+    Tout le reste est ignoré. Rien n'est écrit en base de données.
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+
+    uploaded = request.FILES['file']
+    if not uploaded.name.lower().endswith('.csv'):
+        return Response({'error': 'Format non supporté. Utilisez un fichier .csv'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        import io
+        content = uploaded.read().decode('utf-8-sig', errors='replace')
+        reader = csv.reader(io.StringIO(content), delimiter=';')
+
+        date_import = date.today().isoformat()
+        rows_to_add = []
+        ignores = 0
+        next(reader, None)  # skip header
+
+        for line in reader:
+            if len(line) < 6:
+                ignores += 1
+                continue
+
+            isin = line[2].strip()
+            cours_raw = line[4].strip().replace(',', '.')
+            devise = line[5].strip()
+
+            if not isin or not cours_raw:
+                ignores += 1
+                continue
+
+            try:
+                cours_float = float(cours_raw)
+            except ValueError:
+                ignores += 1
+                continue
+
+            rows_to_add.append({
+                'isin': isin,
+                'cours': cours_float,
+                'devise': devise if devise else 'EUR',
+                'date_import': date_import,
+            })
+
+        stats = file_storage.append_prix_bonobo(rows_to_add)
+
+        return Response({
+            'success': True,
+            'message': f"Import source Bonobo terminé : {stats['ajoutes']} cours importés",
+            'details': {
+                'fichier': uploaded.name,
+                'date_import': date_import,
+                'ajoutes': stats['ajoutes'],
+                'ignores': stats['ignores'] + ignores,
+                'identifiants': sorted({r['isin'] for r in rows_to_add}),
+            }
+        })
+
+    except Exception as e:
+        return Response({'error': f"Erreur lors de l'import Bonobo : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def import_prix_startfiles(request):
+    """
+    Import tout-en-un : lit le .xlsx (Koala) et le .csv (Bonobo) depuis /app/startfiles,
+    les importe, puis consolide vers prix_historique_titres.json.
+    POST /api/import/prix-startfiles/
+    """
+    import glob, io
+
+    START_DIR = '/app/startfiles'
+    date_import = date.today().isoformat()
+    rapport = {}
+
+    # ── Koala (premier .xlsx trouvé) ─────────────────────────────────────────
+    xlsx_files = sorted(glob.glob(os.path.join(START_DIR, '*.xlsx')))
+    if xlsx_files:
+        xlsx_path = xlsx_files[-1]  # le plus récent (tri alphabétique)
+        try:
+            wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+            ws = wb.active
+            rows_to_add = []
+            ignores_k = 0
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                symbole = row[3] if len(row) > 3 else None
+                cours   = row[7] if len(row) > 7 else None
+                if symbole is None or cours is None:
+                    ignores_k += 1
+                    continue
+                s = str(symbole).strip()
+                if not s:
+                    ignores_k += 1
+                    continue
+                try:
+                    c = float(cours)
+                except (TypeError, ValueError):
+                    ignores_k += 1
+                    continue
+                rows_to_add.append({'symbole': s, 'cours': c, 'date_import': date_import, 'devise': 'EUR'})
+            stats_k = file_storage.append_prix_koala(rows_to_add)
+            rapport['koala'] = {
+                'fichier': os.path.basename(xlsx_path),
+                'ajoutes': stats_k['ajoutes'],
+                'ignores': stats_k['ignores'] + ignores_k,
+            }
+        except Exception as e:
+            rapport['koala'] = {'error': str(e)}
+    else:
+        rapport['koala'] = {'info': 'Aucun fichier .xlsx trouvé dans Start Files'}
+
+    # ── Bonobo (premier .csv trouvé) ─────────────────────────────────────────
+    csv_files = sorted(glob.glob(os.path.join(START_DIR, '*.csv')))
+    if csv_files:
+        csv_path = csv_files[-1]
+        try:
+            with open(csv_path, encoding='utf-8-sig', errors='replace') as f:
+                content = f.read()
+            reader = csv.reader(io.StringIO(content), delimiter=';')
+            rows_to_add = []
+            ignores_b = 0
+            next(reader, None)  # skip header
+            for line in reader:
+                if len(line) < 6:
+                    ignores_b += 1
+                    continue
+                isin      = line[2].strip()
+                cours_raw = line[4].strip().replace(',', '.')
+                devise    = line[5].strip()
+                if not isin or not cours_raw:
+                    ignores_b += 1
+                    continue
+                try:
+                    c = float(cours_raw)
+                except ValueError:
+                    ignores_b += 1
+                    continue
+                rows_to_add.append({'isin': isin, 'cours': c, 'devise': devise or 'EUR', 'date_import': date_import})
+            stats_b = file_storage.append_prix_bonobo(rows_to_add)
+            rapport['bonobo'] = {
+                'fichier': os.path.basename(csv_path),
+                'ajoutes': stats_b['ajoutes'],
+                'ignores': stats_b['ignores'] + ignores_b,
+            }
+        except Exception as e:
+            rapport['bonobo'] = {'error': str(e)}
+    else:
+        rapport['bonobo'] = {'info': 'Aucun fichier .csv trouvé dans Start Files'}
+
+    # ── Consolidation ─────────────────────────────────────────────────────────
+    try:
+        stats_c = file_storage.rebuild_prix_historique_titres()
+        rapport['consolidation'] = stats_c
+    except Exception as e:
+        rapport['consolidation'] = {'error': str(e)}
+
+    errors = [k for k, v in rapport.items() if isinstance(v, dict) and 'error' in v]
+    c = rapport.get('consolidation', {})
+    return Response({
+        'success': len(errors) == 0,
+        'message': (
+            f"Koala : {rapport.get('koala', {}).get('ajoutes', 0)} cours — "
+            f"Bonobo : {rapport.get('bonobo', {}).get('ajoutes', 0)} cours — "
+            f"Consolidé : {c.get('titres_consolides', 0)} titres ({c.get('total_entrees', 0)} entrées)"
+        ),
+        'details': rapport,
+    })
+
+
+@api_view(['GET'])
+def get_bonobo_history(request):
+    """Retourne l'historique complet des cours Bonobo (GET /api/import/bonobo/history/)"""
+    historique = file_storage.get_prix_historique_bonobo()
+    return Response(historique)
+
+
+@api_view(['POST'])
+def consolidate_prices(request):
+    """Consolide Koala + Bonobo → prix_historique_titres.json (POST /api/prix-historique/consolidate/)"""
+    try:
+        stats = file_storage.rebuild_prix_historique_titres()
+        return Response({
+            'success': True,
+            'message': (
+                f"{stats['titres_consolides']} titres consolidés "
+                f"({stats['total_entrees']} entrées — "
+                f"{stats['koala_matches']} Koala, {stats['bonobo_matches']} Bonobo)"
+            ),
+            'details': stats,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def titre_price_history(request, isin):
+    """Retourne l'historique de prix pour un titre (GET /api/prix-historique/<isin>/)"""
+    data = file_storage.get_prix_titre_by_isin(isin)
+    if data is None:
+        return Response(
+            {'error': f"Aucun historique trouvé pour {isin}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(data)
+
+
 @api_view(['POST'])
 def backup_all_data(request):
     """Export toutes les données (cash, portefeuilles cibles, transactions, signalétique)
@@ -326,12 +627,50 @@ def backup_all_data(request):
     today = date_cls.today().strftime('%Y-%m-%d')
     fichiers_crees = []
 
+    def safe_save(wb, path):
+        """Supprime le fichier existant avant de sauvegarder pour éviter les erreurs de permission."""
+        if os.path.exists(path):
+            try:
+                os.chmod(path, 0o666)
+                os.remove(path)
+            except OSError:
+                pass  # Si toujours impossible, openpyxl écrasera ou lèvera une erreur plus claire
+        try:
+            wb.save(path)
+        except PermissionError:
+            fname = os.path.basename(path)
+            raise PermissionError(
+                f"Impossible d'écrire '{fname}' : le fichier est peut-être ouvert dans Excel. "
+                f"Fermez-le puis relancez la sauvegarde."
+            )
+
     def style_header(ws, col_count):
         for col in range(1, col_count + 1):
             cell = ws.cell(row=1, column=col)
             cell.font = Font(bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor='2E4057')
             cell.alignment = Alignment(horizontal='center')
+
+    # ── 0. PORTEFEUILLES RÉELS ─────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Portefeuilles'
+    headers_pf = ['Nom', 'Description', 'Type', 'Courtier', 'Devise', 'Date ouverture', 'Couleur']
+    ws.append(headers_pf)
+    style_header(ws, len(headers_pf))
+    for pf in file_storage.get_all_portfolios():
+        ws.append([
+            pf.get('name', ''),
+            pf.get('description', '') or '',
+            pf.get('type_compte', '') or '',
+            pf.get('courtier', '') or '',
+            pf.get('devise', 'EUR') or 'EUR',
+            pf.get('date_ouverture', '') or '',
+            pf.get('couleur', '') or '',
+        ])
+    pf_path = os.path.join(SAUVEGARDE_DIR, f'portefeuilles_{today}.xlsx')
+    safe_save(wb, pf_path)
+    fichiers_crees.append(f'portefeuilles_{today}.xlsx')
 
     # ── 1. CASH ──────────────────────────────────────────────────────────────
     wb = openpyxl.Workbook()
@@ -351,7 +690,7 @@ def backup_all_data(request):
             c.get('commentaire', '') or '',
         ])
     cash_path = os.path.join(SAUVEGARDE_DIR, f'lastcash_{today}.xlsx')
-    wb.save(cash_path)
+    safe_save(wb, cash_path)
     fichiers_crees.append(f'lastcash_{today}.xlsx')
 
     # ── 2. PORTEFEUILLES CIBLES ───────────────────────────────────────────────
@@ -371,7 +710,7 @@ def backup_all_data(request):
                 item.get('ratio', 0),
             ])
     tp_path = os.path.join(SAUVEGARDE_DIR, f'portefeuillecible_{today}.xlsx')
-    wb.save(tp_path)
+    safe_save(wb, tp_path)
     fichiers_crees.append(f'portefeuillecible_{today}.xlsx')
 
     # ── 3. TRANSACTIONS ───────────────────────────────────────────────────────
@@ -394,7 +733,7 @@ def backup_all_data(request):
             portfolio['name'] if portfolio else str(tx.get('portfolio_id', '')),
         ])
     tx_path = os.path.join(SAUVEGARDE_DIR, f'transactions_{today}.xlsx')
-    wb.save(tx_path)
+    safe_save(wb, tx_path)
     fichiers_crees.append(f'transactions_{today}.xlsx')
 
     # ── 4. SIGNALÉTIQUE ───────────────────────────────────────────────────────
@@ -425,7 +764,7 @@ def backup_all_data(request):
         ] + [ds.get(f, '') for f in extra_fields]
         ws.append(row)
     sig_path = os.path.join(SAUVEGARDE_DIR, f'signaletique_{today}.xlsx')
-    wb.save(sig_path)
+    safe_save(wb, sig_path)
     fichiers_crees.append(f'signaletique_{today}.xlsx')
 
     # ── 5. UTILISATEURS ───────────────────────────────────────────────────────────────────────
@@ -448,9 +787,35 @@ def backup_all_data(request):
             u.password,  # hash Django (pbkdf2_sha256$...)
         ])
     users_path = os.path.join(SAUVEGARDE_DIR, f'utilisateurs_{today}.xlsx')
-    wb.save(users_path)
+    safe_save(wb, users_path)
     fichiers_crees.append(f'utilisateurs_{today}.xlsx')
     nb_users = DjangoUser.objects.count()
+
+    # ── 6. PRIX HISTORIQUE TITRES ─────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Prix Historique'
+    headers_prix = ['ISIN', 'Nom', 'Date', 'Cours', 'Devise', 'Source', 'Symbole']
+    ws.append(headers_prix)
+    style_header(ws, len(headers_prix))
+    prix_titres = file_storage.get_prix_historique_titres()
+    nb_prix = 0
+    for isin, titre_data in sorted(prix_titres.items()):
+        nom = titre_data.get('nom', '')
+        for entry in (titre_data.get('historique') or []):
+            ws.append([
+                isin,
+                nom,
+                entry.get('date', ''),
+                float(entry['cours']) if entry.get('cours') is not None else '',
+                entry.get('devise', ''),
+                entry.get('source', ''),
+                entry.get('symbole', '') or '',
+            ])
+            nb_prix += 1
+    prix_path = os.path.join(SAUVEGARDE_DIR, f'prix_historique_{today}.xlsx')
+    safe_save(wb, prix_path)
+    fichiers_crees.append(f'prix_historique_{today}.xlsx')
 
     return Response({
         'success': True,
@@ -458,11 +823,13 @@ def backup_all_data(request):
         'repertoire': SAUVEGARDE_DIR,
         'fichiers': fichiers_crees,
         'stats': {
+            'portefeuilles': len(file_storage.get_all_portfolios()),
             'cash': len(file_storage.get_all_cash()),
             'portefeuilles_cibles': len(file_storage.get_all_target_portfolios()),
             'transactions': len(file_storage.get_all_transactions()),
             'signaletiques': len(sigs),
             'utilisateurs': nb_users,
+            'prix_historique': nb_prix,
         }
     })
 
@@ -479,7 +846,7 @@ def restore_all_data(request):
     import glob
     from django.contrib.auth.models import User as DjangoUser
 
-    SAUVEGARDE_DIR = '/app/sauvegarde'
+    SAUVEGARDE_DIR = '/app/startfiles'
     results = {}
 
     def latest_file(prefix):
@@ -492,6 +859,74 @@ def restore_all_data(request):
         if isinstance(v, date):
             return v
         return v
+
+    # ── 0. PORTEFEUILLES RÉELS ────────────────────────────────────────────────
+    # Priorité 1 : snapshot JSON (préserve IDs + tous les champs)
+    # Priorité 2 : fichier Excel (reconstruit par nom, IDs recalculés)
+    snapshots = file_storage.list_json_snapshots(SAUVEGARDE_DIR)
+    pf_json_restored = False
+    if snapshots:
+        latest_snap = snapshots[-1]
+        snap_pf_file = os.path.join(SAUVEGARDE_DIR, latest_snap, 'portfolios.json')
+        if os.path.exists(snap_pf_file):
+            try:
+                pf_data = file_storage._read_json_file(snap_pf_file, [])
+                file_storage._write_json_file(file_storage.PORTFOLIOS_FILE, pf_data)
+                results['portefeuilles'] = {
+                    'succes': len(pf_data), 'erreurs': 0,
+                    'source': f'snapshot JSON ({latest_snap})',
+                    'note': 'IDs et tous les champs préservés',
+                }
+                pf_json_restored = True
+            except Exception as e:
+                results['portefeuilles'] = {'error': f'Erreur snapshot JSON : {e}'}
+
+    # Dictionnaire de référence nom → métadonnées, utilisé comme fallback
+    # dans toutes les sections qui créent des portefeuilles à la volée.
+    portfolio_meta_ref: dict = {}
+
+    if not pf_json_restored:
+        pf_xlsx_path = latest_file('portefeuilles')
+        if pf_xlsx_path:
+            try:
+                wb = openpyxl.load_workbook(pf_xlsx_path)
+                ws = wb.active
+                headers_pf = [str(c.value or '').strip() for c in ws[1]]
+                succes_pf = 0
+                erreurs_pf = []
+                for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if not any(c is not None and str(c).strip() != '' for c in row):
+                        continue
+                    row_data = {h: v for h, v in zip(headers_pf, row)}
+                    nom = str(row_data.get('Nom') or '').strip()
+                    if not nom:
+                        erreurs_pf.append(f"Ligne {row_idx}: nom manquant")
+                        continue
+                    pf_fields = {
+                        'description':    str(row_data.get('Description') or '') or None,
+                        'type_compte':    str(row_data.get('Type') or '') or None,
+                        'courtier':       str(row_data.get('Courtier') or '') or None,
+                        'devise':         str(row_data.get('Devise') or 'EUR'),
+                        'date_ouverture': str(row_data.get('Date ouverture') or '') or None,
+                        'couleur':        str(row_data.get('Couleur') or '') or None,
+                    }
+                    # Mémoriser pour les créations à la volée dans les sections suivantes
+                    portfolio_meta_ref[nom] = pf_fields
+                    existing = file_storage.get_portfolio_by_name(nom)
+                    if existing:
+                        file_storage.update_portfolio(existing['id'], pf_fields)
+                    else:
+                        file_storage.create_portfolio(name=nom, **pf_fields)
+                    succes_pf += 1
+                results['portefeuilles'] = {
+                    'succes': succes_pf, 'erreurs': len(erreurs_pf),
+                    'source': f'Excel ({os.path.basename(pf_xlsx_path)})',
+                    'note': 'IDs recalculés — snapshot JSON non disponible',
+                }
+            except Exception as e:
+                results['portefeuilles'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(pf_xlsx_path), 'error': str(e)}
+        else:
+            results['portefeuilles'] = {'info': 'Aucune source disponible (ni snapshot JSON ni portefeuilles_*.xlsx)'}
 
     # ── 1. SIGNALÉTIQUE ──────────────────────────────────────────────────────
     sig_path = latest_file('signaletique')
@@ -590,7 +1025,8 @@ def restore_all_data(request):
                     type_op = 'ACHAT' if 'achat' in type_op.lower() else 'VENTE'
 
                 portfolio, _ = file_storage.get_or_create_portfolio(
-                    nom_portfolio, defaults={'description': f'Portefeuille {nom_portfolio}'}
+                    nom_portfolio,
+                    defaults=portfolio_meta_ref.get(nom_portfolio, {'description': f'Portefeuille {nom_portfolio}'})
                 )
                 sig_dict = file_storage.get_signaletique_by_isin(isin)
                 if not sig_dict:
@@ -655,7 +1091,8 @@ def restore_all_data(request):
                     date_obj = datetime.fromisoformat(str(date_raw)).date()
 
                 portfolio, _ = file_storage.get_or_create_portfolio(
-                    nom_portfolio, defaults={'description': f'Portefeuille {nom_portfolio}'}
+                    nom_portfolio,
+                    defaults=portfolio_meta_ref.get(nom_portfolio, {'description': f'Portefeuille {nom_portfolio}'})
                 )
                 file_storage.create_cash(portfolio['id'], banque, montant, devise, date_obj, commentaire)
                 succes += 1
@@ -891,16 +1328,21 @@ def list_real_portfolios(request):
     
     elif request.method == 'POST':
         name = request.data.get('name')
-        description = request.data.get('description')
-        
         if not name:
             return Response(
                 {'error': 'Le nom du portefeuille est requis'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
         try:
-            portfolio = file_storage.create_portfolio(name, description)
+            portfolio = file_storage.create_portfolio(
+                name=name,
+                description=request.data.get('description'),
+                type_compte=request.data.get('type_compte'),
+                courtier=request.data.get('courtier'),
+                devise=request.data.get('devise', 'EUR'),
+                date_ouverture=request.data.get('date_ouverture'),
+                couleur=request.data.get('couleur'),
+            )
             return Response(portfolio, status=status.HTTP_201_CREATED)
         except ValueError as e:
             return Response(
@@ -1946,7 +2388,14 @@ def portfolio_fifo_analysis(request, pk):
     return Response({
         'portfolio': {
             'id': portfolio['id'],
-            'name': portfolio['name']
+            'name': portfolio['name'],
+            'description': portfolio.get('description', ''),
+            'type_compte': portfolio.get('type_compte', ''),
+            'courtier': portfolio.get('courtier', ''),
+            'devise': portfolio.get('devise', 'EUR'),
+            'date_ouverture': portfolio.get('date_ouverture', ''),
+            'couleur': portfolio.get('couleur', ''),
+            'date_creation': portfolio.get('date_creation', ''),
         },
         'positions_actuelles': positions_actuelles,
         'pnl_realise': {

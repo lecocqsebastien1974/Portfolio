@@ -1,0 +1,128 @@
+{
+  "MEUD": [
+    {
+      "cours": 297.9,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "WAT": [
+    {
+      "cours": 72.678,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "S79702488": [
+    {
+      "cours": 106.09,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "CJ1": [
+    {
+      "cours": 336.2079,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "171289902": [
+    {
+      "cours": 19.53,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "S79702685": [
+    {
+      "cours": 426.78,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "GBS": [
+    {
+      "cours": 386.02,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "HSTE": [
+    {
+      "cours": 6.28,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "B28A": [
+    {
+      "cours": 5.68,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "RBOT": [
+    {
+      "cours": 14.16,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "SXR0": [
+    {
+      "cours": 8.599,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "L0CK": [
+    {
+      "cours": 8.222,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "S79703699": [
+    {
+      "cours": 170.45,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "IWDE": [
+    {
+      "cours": 108.6,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "LCUJ": [
+    {
+      "cours": 21.732,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "XDWH": [
+    {
+      "cours": 51.09,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "XDWU": [
+    {
+      "cours": 41.695,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ],
+  "XGIN": [
+    {
+      "cours": 220.47,
+      "date_import": "2026-03-09",
+      "devise": "EUR"
+    }
+  ]
+}

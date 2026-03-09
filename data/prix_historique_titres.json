@@ -1,0 +1,450 @@
+{
+  "LU0908500753": {
+    "isin": "LU0908500753",
+    "nom": "Amundi Core Stoxx Europe 600 UCITS ETF Acc",
+    "signaletique_id": 7,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU0908500753_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 297.9,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "MEUD"
+      }
+    ]
+  },
+  "FR0010527275": {
+    "isin": "FR0010527275",
+    "nom": "Amundi MSCI Water UCITS ETF Dist",
+    "signaletique_id": 8,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "FR0010527275_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 71.311,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "LU1602144732": {
+    "isin": "LU1602144732",
+    "nom": "Amundi MSCI Japan ESG Broad Transition UCITS ETF EUR Acc",
+    "signaletique_id": 9,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU1602144732_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 336.2079,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "CJ1"
+      }
+    ]
+  },
+  "FR0010149179": {
+    "isin": "FR0010149179",
+    "nom": "Carmignac Portofolio Long-Short European Equities A",
+    "signaletique_id": 10,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "FR0010149179_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 426.78,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "S79702685"
+      }
+    ]
+  },
+  "GB00B00FHZ82": {
+    "isin": "GB00B00FHZ82",
+    "nom": "GOLD BULLION SEC",
+    "signaletique_id": 11,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "GB00B00FHZ82_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 386.02,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "GBS"
+      }
+    ]
+  },
+  "IE00BMWXKN31": {
+    "isin": "IE00BMWXKN31",
+    "nom": "HSBC Hang Seng TECH UCITS ETF HKD",
+    "signaletique_id": 12,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BMWXKN31_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 6.28,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "HSTE"
+      }
+    ]
+  },
+  "IE00BYZK4552": {
+    "isin": "IE00BYZK4552",
+    "nom": "iShares Automation & Robotics UCITS ETF",
+    "signaletique_id": 13,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BYZK4552_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 14.16,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "RBOT"
+      }
+    ]
+  },
+  "IE00BYXPXL17": {
+    "isin": "IE00BYXPXL17",
+    "nom": "iShares Edge MSCI World Minimum Volatility UCITS ETF Hedged EUR Accu",
+    "signaletique_id": 14,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BYXPXL17_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 8.599,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "SXR0"
+      }
+    ]
+  },
+  "IE00BG0J4C88": {
+    "isin": "IE00BG0J4C88",
+    "nom": "IShares Digital Security UCITS ETF USD Accu",
+    "signaletique_id": 15,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BG0J4C88_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 8.222,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "L0CK"
+      }
+    ]
+  },
+  "LU0740858229": {
+    "isin": "LU0740858229",
+    "nom": "JPMorgan Investment Funds Global Income Fund A (acc) EUR  (50% action / 50% Obligations)",
+    "signaletique_id": 16,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU0740858229_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 170.45,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "S79703699"
+      }
+    ]
+  },
+  "IE00B441G979": {
+    "isin": "IE00B441G979",
+    "nom": "iShares MSCI World EUR Hedged UCITS ETF) EUR Accu",
+    "signaletique_id": 17,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00B441G979_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 108.6,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "IWDE"
+      }
+    ]
+  },
+  "LU1781541252": {
+    "isin": "LU1781541252",
+    "nom": "Amundi Core MSCI Japan UCITS ETF Acc",
+    "signaletique_id": 18,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU1781541252_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 21.732,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "LCUJ"
+      }
+    ]
+  },
+  "IE00BM67HK77": {
+    "isin": "IE00BM67HK77",
+    "nom": "Xtrackers MSCI World Health Care UCITS ETF",
+    "signaletique_id": 19,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BM67HK77_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 51.09,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "XDWH"
+      }
+    ]
+  },
+  "IE00BM67HQ30": {
+    "isin": "IE00BM67HQ30",
+    "nom": "Xtrackers MSCI World Utilities UCITS ETF",
+    "signaletique_id": 20,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BM67HQ30_2026-03-09_0_koala",
+        "date": "2026-03-09",
+        "cours": 41.695,
+        "devise": "EUR",
+        "source": "koala",
+        "symbole": "XDWU"
+      }
+    ]
+  },
+  "LU2314312849": {
+    "isin": "LU2314312849",
+    "nom": "BNP Paribas Easy MSCI China Min TE UCITS ETF EUR Acc",
+    "signaletique_id": 21,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU2314312849_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 7.592,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "LU2823898353": {
+    "isin": "LU2823898353",
+    "nom": "BNP PARIBAS EASY ESG ENHANCED EUR CORP BOND DECEMBER 2027 Cap",
+    "signaletique_id": 26,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU2823898353_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 10.669,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "IE00B8FHGS14": {
+    "isin": "IE00B8FHGS14",
+    "nom": "iShares Edge MSCI World Minimum Volatility UCITS ETF USD (Acc)",
+    "signaletique_id": 22,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00B8FHGS14_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 63.57,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "IE0008UEVOE0": {
+    "isin": "IE0008UEVOE0",
+    "nom": "iShares iBonds Dec 2028 Term € Corp UCITS ETF Dis",
+    "signaletique_id": 25,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE0008UEVOE0_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 5.675,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "IE00BJ5JPG56": {
+    "isin": "IE00BJ5JPG56",
+    "nom": "iShares MSCI China UCITS ETF USD (Acc)",
+    "signaletique_id": 23,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BJ5JPG56_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 6.271,
+        "devise": "USD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "IE00BDZVH966": {
+    "isin": "IE00BDZVH966",
+    "nom": "iShares $ TIPS UCITS ETF",
+    "signaletique_id": 27,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BDZVH966_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 5.4,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "IE00BSJCQV56": {
+    "isin": "IE00BSJCQV56",
+    "nom": "SPDR FTSE EPRA Europe ex UK Real Estate UCITS ETF",
+    "signaletique_id": 24,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BSJCQV56_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 30.285,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "US045167DR18": {
+    "isin": "US045167DR18",
+    "nom": "Asian Development Bank (ADB) 1,75% 16/26",
+    "signaletique_id": 2,
+    "devise_ref": "USD",
+    "historique": [
+      {
+        "id": "US045167DR18_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 99.005,
+        "devise": "USD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "CA045167FA66": {
+    "isin": "CA045167FA66",
+    "nom": "CA045167FA66",
+    "signaletique_id": null,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "CA045167FA66_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 99.99,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "US298785HM16": {
+    "isin": "US298785HM16",
+    "nom": "European Investment Bank (EIB) 2,375% 17/27",
+    "signaletique_id": 3,
+    "devise_ref": "USD",
+    "historique": [
+      {
+        "id": "US298785HM16_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 98.51,
+        "devise": "USD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "XS1950499712": {
+    "isin": "XS1950499712",
+    "nom": "XS1950499712",
+    "signaletique_id": null,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "XS1950499712_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 99.985,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "US91282CAD39": {
+    "isin": "US91282CAD39",
+    "nom": "United States of America 0,375% 20/27",
+    "signaletique_id": 4,
+    "devise_ref": "USD",
+    "historique": [
+      {
+        "id": "US91282CAD39_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 95.62,
+        "devise": "USD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "NZGOVDT528C6": {
+    "isin": "NZGOVDT528C6",
+    "nom": "Government ofNew Zealand 0,25% 20/28",
+    "signaletique_id": 5,
+    "devise_ref": "NZD",
+    "historique": [
+      {
+        "id": "NZGOVDT528C6_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 93.485,
+        "devise": "NZD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "NZGOVDT526C0": {
+    "isin": "NZGOVDT526C0",
+    "nom": "Government ofNew Zealand 0,5% 20/26",
+    "signaletique_id": 6,
+    "devise_ref": "NZD",
+    "historique": [
+      {
+        "id": "NZGOVDT526C0_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 99.488,
+        "devise": "NZD",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "LU0099624925": {
+    "isin": "LU0099624925",
+    "nom": "BNP Paribas Euro Short Term Corporate Bond Opportunities Dis",
+    "signaletique_id": 28,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "LU0099624925_2026-03-09_0_bonobo",
+        "date": "2026-03-09",
+        "cours": 46.19,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  }
+}

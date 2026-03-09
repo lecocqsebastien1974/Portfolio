@@ -36,15 +36,23 @@ function Home() {
         setBackupMessage({
           type: 'success',
           text: `✅ Sauvegarde du ${data.date} créée dans Sauvegarde/ — `
-              + `${stats.cash} cash, ${stats.transactions} transactions, `
+              + `${stats.portefeuilles ?? 0} portefeuilles, ${stats.cash} cash, ${stats.transactions} transactions, `
               + `${stats.portefeuilles_cibles} port. cibles, ${stats.signaletiques} signalétiques`,
           files: data.fichiers,
         });
       } else {
-        setBackupMessage({ type: 'error', text: `❌ Erreur: ${data.error || 'inconnue'}` });
+        const errMsg = data.error || 'inconnue';
+        const excelHint = errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('ouvert')
+          ? ' Vérifiez que vous n\'avez pas un des fichiers de sauvegarde ouvert dans Excel.'
+          : '';
+        setBackupMessage({ type: 'error', text: `❌ Erreur : ${errMsg}${excelHint}` });
       }
     } catch (e) {
-      setBackupMessage({ type: 'error', text: `❌ Erreur réseau: ${e.message}` });
+      const isJsonError = e.message.includes('JSON') || e.message.includes('token') || e.message.includes('DOCTYPE');
+      const hint = isJsonError
+        ? ' Vérifiez que vous n\'avez pas un des fichiers de sauvegarde ouvert dans Excel.'
+        : '';
+      setBackupMessage({ type: 'error', text: `❌ Erreur réseau : ${e.message}${hint}` });
     } finally {
       setBackupLoading(false);
     }
@@ -64,6 +72,9 @@ function Home() {
       if (res.ok && data.success) {
         const d = data.details;
         const lines = [
+          d.portefeuilles && !d.portefeuilles.error
+            ? `Portefeuilles : ${d.portefeuilles.succes ?? '—'} importés${d.portefeuilles.source ? ` via ${d.portefeuilles.source}` : ''}`
+            : `Portefeuilles : ${d.portefeuilles?.error || d.portefeuilles?.info || 'ignoré'}`,
           d.signaletique && !d.signaletique.error
             ? `Signalétique : ${d.signaletique.succes} importées (${d.signaletique.fichier})`
             : `Signalétique : ${d.signaletique?.error || 'erreur'}`,
@@ -181,7 +192,7 @@ function Home() {
                 className="btn"
                 style={{ backgroundColor: '#2980b9', color: 'white', opacity: restoreLoading ? 0.7 : 1, cursor: restoreLoading ? 'wait' : 'pointer' }}
               >
-                {restoreLoading ? '⏳ Restauration en cours...' : '♻️ Restaurer depuis Sauvegarde'}
+                {restoreLoading ? '⏳ Chargement en cours...' : '📂 Charger les données initiales'}
               </button>
             )}
             <button

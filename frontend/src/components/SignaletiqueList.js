@@ -15,6 +15,34 @@ function SignaletiqueList() {
   const [filterClass, setFilterClass] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add');
+
+  // Import source Koala
+  const [showKoalaPanel, setShowKoalaPanel] = useState(false);
+  const [koalaFile, setKoalaFile] = useState(null);
+  const [koalaImporting, setKoalaImporting] = useState(false);
+  const [koalaMessage, setKoalaMessage] = useState('');
+  const [koalaHistory, setKoalaHistory] = useState(null);
+  const [showKoalaHistory, setShowKoalaHistory] = useState(false);
+
+  // Import source Bonobo
+  const [showBonoboPanel, setShowBonoboPanel] = useState(false);
+  const [bonoboFile, setBonoboFile] = useState(null);
+  const [bonoboImporting, setBonoboImporting] = useState(false);
+  const [bonoboMessage, setBonoboMessage] = useState('');
+  const [bonoboHistory, setBonoboHistory] = useState(null);
+  const [showBonoboHistory, setShowBonoboHistory] = useState(false);
+
+  // Historique consolidé des cours
+  const [titreHistory, setTitreHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showTitreHistory, setShowTitreHistory] = useState(false);
+  const [historyStatus, setHistoryStatus] = useState(null); // null | 'ok' | 'not_found' | 'error'
+  const [consolidating, setConsolidating] = useState(false);
+  const [consolidateMsg, setConsolidateMsg] = useState('');
+
+  // Import tout-en-un depuis Start Files
+  const [importingPrix, setImportingPrix] = useState(false);
+  const [importPrixMsg, setImportPrixMsg] = useState('');
   const [formData, setFormData] = useState({
     code: '',
     Nom: '',
@@ -39,6 +67,12 @@ function SignaletiqueList() {
     'Banque Emetteur': '',
     'Autre Emetteur': '',
     'Banques Dispo': '',
+    // Prix / Cours
+    prix: '',
+    devise_prix: '',
+    source_prix: '',
+    date_cours: '',
+    frequence_coupon: '',
     USA: '',
     Canada: '',
     France: '',
@@ -151,6 +185,173 @@ function SignaletiqueList() {
     }
   };
 
+  const handleKoalaImport = async () => {
+    if (!koalaFile) {
+      setKoalaMessage('⚠️ Veuillez sélectionner un fichier .xlsx');
+      return;
+    }
+    setKoalaImporting(true);
+    setKoalaMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', koalaFile);
+      const response = await fetch(`${API_URL}/api/import/koala/`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur serveur');
+      const ids = data.details?.identifiants || [];
+      setKoalaMessage(
+        `✅ ${data.details?.ajoutes ?? 0} cours importés (${ids.length} symboles) • date : ${data.details?.date_import}${
+          data.details?.ignores ? ` • ${data.details.ignores} ignoré(s)` : ''
+        }`
+      );
+      setKoalaFile(null);
+      // Consolidation silencieuse
+      fetch(`${API_URL}/api/prix-historique/consolidate/`, { method: 'POST' }).catch(() => {});
+    } catch (err) {
+      setKoalaMessage(`❌ ${err.message}`);
+    } finally {
+      setKoalaImporting(false);
+    }
+  };
+
+  const handleViewKoalaHistory = async () => {
+    if (showKoalaHistory) {
+      setShowKoalaHistory(false);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/import/koala/history/`);
+      const data = await response.json();
+      setKoalaHistory(data);
+      setShowKoalaHistory(true);
+    } catch (err) {
+      setKoalaMessage(`❌ Impossible de charger l'historique : ${err.message}`);
+    }
+  };
+
+  const handleBonoboImport = async () => {
+    if (!bonoboFile) {
+      setBonoboMessage('⚠️ Veuillez sélectionner un fichier .csv');
+      return;
+    }
+    setBonoboImporting(true);
+    setBonoboMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', bonoboFile);
+      const response = await fetch(`${API_URL}/api/import/bonobo/`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur serveur');
+      const ids = data.details?.identifiants || [];
+      setBonoboMessage(
+        `✅ ${data.details?.ajoutes ?? 0} cours importés (${ids.length} ISIN) • date : ${data.details?.date_import}${
+          data.details?.ignores ? ` • ${data.details.ignores} ignoré(s)` : ''
+        }`
+      );
+      setBonoboFile(null);
+      // Consolidation silencieuse
+      fetch(`${API_URL}/api/prix-historique/consolidate/`, { method: 'POST' }).catch(() => {});
+    } catch (err) {
+      setBonoboMessage(`❌ ${err.message}`);
+    } finally {
+      setBonoboImporting(false);
+    }
+  };
+
+  const handleViewBonoboHistory = async () => {
+    if (showBonoboHistory) {
+      setShowBonoboHistory(false);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/import/bonobo/history/`);
+      const data = await response.json();
+      setBonoboHistory(data);
+      setShowBonoboHistory(true);
+    } catch (err) {
+      setBonoboMessage(`❌ Impossible de charger l'historique : ${err.message}`);
+    }
+  };
+
+  const handleImportPrix = async () => {
+    setImportingPrix(true);
+    setImportPrixMsg('');
+    try {
+      const response = await fetch(`${API_URL}/api/import/prix-startfiles/`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur serveur');
+      const d = data.details || {};
+      const k = d.koala || {};
+      const b = d.bonobo || {};
+      const c = d.consolidation || {};
+      const kFile = k.fichier ? ` (${k.fichier})` : '';
+      const bFile = b.fichier ? ` (${b.fichier})` : '';
+      setImportPrixMsg(
+        `✅ Koala${kFile} : ${k.ajoutes ?? '–'} cours ` +
+        `• Bonobo${bFile} : ${b.ajoutes ?? '–'} cours ` +
+        `• ${c.titres_consolides ?? 0} titres consolidés (${c.total_entrees ?? 0} entrées)`
+      );
+    } catch (err) {
+      setImportPrixMsg(`❌ ${err.message}`);
+    } finally {
+      setImportingPrix(false);
+    }
+  };
+
+  const handleConsolidatePrices = async () => {
+    setConsolidating(true);
+    setConsolidateMsg('');
+    try {
+      const response = await fetch(`${API_URL}/api/prix-historique/consolidate/`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur serveur');
+      setConsolidateMsg(`✅ ${data.message}`);
+    } catch (err) {
+      setConsolidateMsg(`❌ ${err.message}`);
+    } finally {
+      setConsolidating(false);
+    }
+  };
+
+  const handleViewTitreHistory = async (item) => {
+    if (showTitreHistory && titreHistory?.isin === item.isin) {
+      setShowTitreHistory(false);
+      return;
+    }
+    if (!item.isin) {
+      setShowTitreHistory(true);
+      setTitreHistory(null);
+      setHistoryStatus('not_found');
+      return;
+    }
+    setLoadingHistory(true);
+    setShowTitreHistory(false);
+    setHistoryStatus(null);
+    try {
+      const response = await fetch(`${API_URL}/api/prix-historique/${encodeURIComponent(item.isin)}/`);
+      if (response.status === 404) {
+        setTitreHistory(null);
+        setHistoryStatus('not_found');
+      } else {
+        const data = await response.json();
+        setTitreHistory(data);
+        setHistoryStatus('ok');
+      }
+      setShowTitreHistory(true);
+    } catch (err) {
+      setTitreHistory(null);
+      setHistoryStatus('error');
+      setShowTitreHistory(true);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
 
   const openAddModal = () => {
@@ -165,7 +366,12 @@ function SignaletiqueList() {
       'Cap/Dis': '',
       Devise: '',
       TER: '',
-      ESG: ''
+      ESG: '',
+      prix: '',
+      devise_prix: '',
+      source_prix: '',
+      date_cours: '',
+      frequence_coupon: '',
     });
     setShowModal(true);
   };
@@ -202,6 +408,12 @@ function SignaletiqueList() {
       'Banque Emetteur': ds['Banque Emetteur'] || '',
       'Autre Emetteur': ds['Autre Emetteur'] || '',
       'Banques Dispo': ds['Banques Dispo'] || '',
+      // Prix / Cours (champs top-level du modèle)
+      prix: selectedItem.prix || '',
+      devise_prix: selectedItem.devise_prix || '',
+      source_prix: selectedItem.source_prix || '',
+      date_cours: selectedItem.date_cours || '',
+      frequence_coupon: selectedItem.frequence_coupon || '',
       USA: ds['USA'] || '',
       Canada: ds['Canada'] || '',
       France: ds['France'] || '',
@@ -258,6 +470,11 @@ function SignaletiqueList() {
         isin: normalizedIsin || null,
         categorie: formData.categorie_id || null,
         statut: formData['Type d\'instr'] || null,
+        prix: formData.prix !== '' ? formData.prix : null,
+        devise_prix: formData.devise_prix || null,
+        source_prix: formData.source_prix || null,
+        date_cours: formData.date_cours || null,
+        frequence_coupon: formData.frequence_coupon || null,
         donnees_supplementaires: {
           ...formData,
           Isin: normalizedIsin
@@ -399,11 +616,198 @@ function SignaletiqueList() {
             <button className="btn btn-info" onClick={handleExportCSV}>
               💾 Exporter CSV
             </button>
+
+            <button
+              className="btn btn-koala"
+              onClick={() => { setShowKoalaPanel(!showKoalaPanel); setKoalaMessage(''); }}
+            >
+              🐨 Import source Koala
+            </button>
+
+            <button
+              className="btn btn-bonobo"
+              onClick={() => { setShowBonoboPanel(!showBonoboPanel); setBonoboMessage(''); }}
+            >
+              🐒 Import source Bonobo
+            </button>
+
+            <button
+              className="btn btn-consolidate"
+              onClick={handleConsolidatePrices}
+              disabled={consolidating}
+              title="Associer Koala + Bonobo aux titres de la signalétique"
+            >
+              {consolidating ? '⏳ Consolidation…' : '🔗 Consolider les prix'}
+            </button>
+
+            <button
+              className="btn btn-import-prix"
+              onClick={handleImportPrix}
+              disabled={importingPrix}
+              title="Lire les fichiers Koala (.xlsx) et Bonobo (.csv) dans Start Files, puis consolider"
+            >
+              {importingPrix ? '⏳ Import en cours…' : '📥 Importer les prix'}
+            </button>
           </div>
+          {consolidateMsg && (
+            <div className={`message ${consolidateMsg.startsWith('✅') ? 'success' : 'error'} consolidate-msg`}>
+              {consolidateMsg}
+            </div>
+          )}
+          {importPrixMsg && (
+            <div className={`message ${importPrixMsg.startsWith('✅') ? 'success' : 'error'} consolidate-msg`}>
+              {importPrixMsg}
+            </div>
+          )}
         </div>
 
-        {loading && <div className="loading">{t('signaletique.loading')}</div>}
+        {/* ── Panneau Import source Koala ── */}
+        {showKoalaPanel && (
+          <div className="koala-panel">
+            <h3>🐨 Import source Koala</h3>
+            <p className="koala-desc">
+              Importe uniquement les colonnes <strong>D (Symbole)</strong> et <strong>H (Cours)</strong>
+              depuis un fichier Koala (.xlsx). Chaque import est horodaté et stocké dans l'historique
+              de prix par symbole. Aucune donnée n'est écrite en base de données.
+            </p>
+            <div className="koala-form">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="form-input"
+                onChange={(e) => setKoalaFile(e.target.files[0] || null)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleKoalaImport}
+                disabled={koalaImporting || !koalaFile}
+              >
+                {koalaImporting ? '⏳ Import en cours…' : '📥 Importer'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleViewKoalaHistory}
+              >
+                {showKoalaHistory ? '🙈 Masquer l\'historique' : '📜 Voir l\'historique'}
+              </button>
+            </div>
+            {koalaMessage && (
+              <div className={`message ${koalaMessage.startsWith('✅') ? 'success' : 'error'}`}>
+                {koalaMessage}
+              </div>
+            )}
+            {showKoalaHistory && koalaHistory && (
+              <div className="koala-history">
+                <h4>Historique des cours (par symbole)</h4>
+                {Object.keys(koalaHistory).length === 0 ? (
+                  <p>Aucun historique disponible.</p>
+                ) : (
+                  <table className="data-table koala-history-table">
+                    <thead>
+                      <tr>
+                        <th>Symbole</th>
+                        <th>Entrées</th>
+                        <th>Dernier cours</th>
+                        <th>Dernière date</th>
+                        <th>Devise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(koalaHistory).sort().map(([sym, entries]) => {
+                        const last = entries[entries.length - 1];
+                        return (
+                          <tr key={sym}>
+                            <td><strong>{sym}</strong></td>
+                            <td>{entries.length}</td>
+                            <td>{last.cours.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 4})}</td>
+                            <td>{last.date_import}</td>
+                            <td>{last.devise}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Panneau Import source Bonobo ── */}
+        {showBonoboPanel && (
+          <div className="koala-panel bonobo-panel">
+            <h3>🐒 Import source Bonobo</h3>
+            <p className="koala-desc">
+              Importe uniquement les colonnes <strong>3 (ISIN)</strong>, <strong>5 (Cours)</strong>
+              et <strong>6 (Devise)</strong> depuis un fichier CSV Bonobo (séparateur&nbsp;<code>;</code>).
+              Chaque import est horodaté et stocké dans l'historique de prix par ISIN.
+              Aucune donnée n'est écrite en base de données.
+            </p>
+            <div className="koala-form">
+              <input
+                type="file"
+                accept=".csv"
+                className="form-input"
+                onChange={(e) => setBonoboFile(e.target.files[0] || null)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleBonoboImport}
+                disabled={bonoboImporting || !bonoboFile}
+              >
+                {bonoboImporting ? '⏳ Import en cours…' : '📥 Importer'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleViewBonoboHistory}
+              >
+                {showBonoboHistory ? '🙈 Masquer l\'historique' : '📜 Voir l\'historique'}
+              </button>
+            </div>
+            {bonoboMessage && (
+              <div className={`message ${bonoboMessage.startsWith('✅') ? 'success' : 'error'}`}>
+                {bonoboMessage}
+              </div>
+            )}
+            {showBonoboHistory && bonoboHistory && (
+              <div className="koala-history">
+                <h4>Historique des cours (par ISIN)</h4>
+                {Object.keys(bonoboHistory).length === 0 ? (
+                  <p>Aucun historique disponible.</p>
+                ) : (
+                  <table className="data-table koala-history-table">
+                    <thead>
+                      <tr>
+                        <th>ISIN</th>
+                        <th>Entrées</th>
+                        <th>Dernier cours</th>
+                        <th>Dernière date</th>
+                        <th>Devise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(bonoboHistory).sort().map(([isin, entries]) => {
+                        const last = entries[entries.length - 1];
+                        return (
+                          <tr key={isin}>
+                            <td><strong>{isin}</strong></td>
+                            <td>{entries.length}</td>
+                            <td>{last.cours.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 4})}</td>
+                            <td>{last.date_import}</td>
+                            <td>{last.devise}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         
+        {loading && <div className="loading">{t('signaletique.loading')}</div>}
+
         {error && (
           <div className="message error">
             ❌ {error}
@@ -432,7 +836,7 @@ function SignaletiqueList() {
                       <div 
                         key={item.id} 
                         className={`data-item ${selectedItem?.id === item.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedItem(item)}
+                        onClick={() => { setSelectedItem(item); setShowTitreHistory(false); setTitreHistory(null); setHistoryStatus(null); }}
                       >
                         <div className="item-header">
                           <div className="item-badges">
@@ -460,6 +864,13 @@ function SignaletiqueList() {
                         >
                           ✏️
                         </button>
+                        <button
+                          className="btn-small btn-history"
+                          onClick={() => handleViewTitreHistory(selectedItem)}
+                          title="Historique des cours"
+                        >
+                          📈
+                        </button>
                       </div>
                     </div>
                     
@@ -470,6 +881,28 @@ function SignaletiqueList() {
                           {getDisplayName(selectedItem) || 'N/A'}
                         </span>
                       </div>
+                      {(selectedItem.prix || selectedItem.source_prix) && (
+                        <div className="detail-row detail-row-prix">
+                          <span className="detail-label">💰 Prix / Cours:</span>
+                          <span className="detail-value">
+                            {selectedItem.prix
+                              ? `${parseFloat(selectedItem.prix).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 4})} ${selectedItem.devise_prix || ''}`
+                              : '-'}
+                            {selectedItem.date_cours && (
+                              <span className="detail-sub"> au {new Date(selectedItem.date_cours).toLocaleDateString('fr-FR')}</span>
+                            )}
+                            {selectedItem.source_prix && (
+                              <span className="detail-sub source-prix"> ({selectedItem.source_prix})</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {selectedItem.frequence_coupon && (
+                        <div className="detail-row">
+                          <span className="detail-label">Fréq. Coupon:</span>
+                          <span className="detail-value">{selectedItem.frequence_coupon}</span>
+                        </div>
+                      )}
                       {(() => {
                         const ds = selectedItem.donnees_supplementaires || {};
                         const normalizeKey = (key) => String(key)
@@ -493,6 +926,8 @@ function SignaletiqueList() {
                           { label: 'Positions', keys: ['Positions'] },
                           { label: 'Date de fin', keys: ['Date de fin'] },
                           { label: 'Fréquence Coupon', keys: ['Frequence Coupon', 'Fréquence Coupon'] },
+                          { label: 'Prix / Cours', keys: [] },  // handled separately
+
                           { label: 'Réplication', keys: ['Réplication', 'Replication'] },
                           { label: 'Qualité crédit', keys: ['Qualité crédit', 'Qualité credit', 'Qualite crédit', 'Qualite credit'] },
                           { label: 'Taille du Fonds', keys: ['Taille du Fonds'] },
@@ -532,6 +967,46 @@ function SignaletiqueList() {
                         ));
                       })()}
                     </div>
+
+                    {showTitreHistory && (
+                      <div className="titre-history-section">
+                        <h4 className="titre-history-title">📈 Historique des cours</h4>
+                        {loadingHistory ? (
+                          <p className="loading-small">Chargement…</p>
+                        ) : historyStatus === 'ok' && titreHistory && titreHistory.historique && titreHistory.historique.length > 0 ? (
+                          <table className="data-table koala-history-table titre-history-table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Cours</th>
+                                <th>Devise</th>
+                                <th>Source</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {titreHistory.historique.map((entry, idx) => (
+                                <tr key={entry.id || idx}>
+                                  <td>{entry.date}</td>
+                                  <td>{Number(entry.cours).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                                  <td>{entry.devise}</td>
+                                  <td><span className={`source-badge source-${entry.source}`}>{entry.source}</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : historyStatus === 'not_found' ? (
+                          <p className="no-history-msg">
+                            Aucun cours importé pour ce titre. Vérifiez que son ISIN figure dans les fichiers Koala ou Bonobo puis cliquez sur « 📥 Importer les prix ».
+                          </p>
+                        ) : historyStatus === 'error' ? (
+                          <p className="no-history-msg">❌ Erreur lors du chargement de l’historique.</p>
+                        ) : (
+                          <p className="no-history-msg">
+                            Aucun cours disponible. Cliquez sur « 🔗 Consolider les prix » pour associer les cours importés.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="no-selection">
@@ -674,21 +1149,6 @@ function SignaletiqueList() {
                   </div>
 
                   <div className="form-group">
-                    <label>Fréquence Coupon</label>
-                    <select
-                      value={formData['Frequence Coupon']}
-                      onChange={(e) => setFormData({...formData, 'Frequence Coupon': e.target.value})}
-                      className="form-input"
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      <option value="Annuelle">Annuelle</option>
-                      <option value="Semi-annuelle">Semi-annuelle</option>
-                      <option value="Trimestrielle">Trimestrielle</option>
-                      <option value="Mensuelle">Mensuelle</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
                     <label>Réplication</label>
                     <input
                       type="text"
@@ -726,6 +1186,79 @@ function SignaletiqueList() {
                       onChange={(e) => setFormData({...formData, 'Couverture de change': e.target.value})}
                       className="form-input"
                     />
+                  </div>
+
+                  <div className="form-section-title">💰 Prix / Cours</div>
+
+                  <div className="form-group">
+                    <label>Prix / Cours</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={formData.prix}
+                      onChange={(e) => setFormData({...formData, prix: e.target.value})}
+                      placeholder="Ex: 98.50"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Devise du prix</label>
+                    <input
+                      type="text"
+                      value={formData.devise_prix}
+                      onChange={(e) => setFormData({...formData, devise_prix: e.target.value.toUpperCase()})}
+                      placeholder="EUR, USD..."
+                      maxLength="10"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Source du prix</label>
+                    <input
+                      type="text"
+                      list="sources-prix-list"
+                      value={formData.source_prix}
+                      onChange={(e) => setFormData({...formData, source_prix: e.target.value})}
+                      placeholder="Manuel, Yahoo Finance..."
+                      className="form-input"
+                    />
+                    <datalist id="sources-prix-list">
+                      <option value="Manuel" />
+                      <option value="Yahoo Finance" />
+                      <option value="Bloomberg" />
+                      <option value="Reuters" />
+                      <option value="Site émetteur" />
+                      <option value="Bourse" />
+                    </datalist>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Date du cours</label>
+                    <input
+                      type="date"
+                      value={formData.date_cours}
+                      onChange={(e) => setFormData({...formData, date_cours: e.target.value})}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Fréquence Coupon</label>
+                    <select
+                      value={formData.frequence_coupon}
+                      onChange={(e) => setFormData({...formData, frequence_coupon: e.target.value})}
+                      className="form-input"
+                    >
+                      <option value="">-- Sélectionner --</option>
+                      <option value="Annuelle">Annuelle</option>
+                      <option value="Semi-annuelle">Semi-annuelle</option>
+                      <option value="Trimestrielle">Trimestrielle</option>
+                      <option value="Mensuelle">Mensuelle</option>
+                      <option value="À l'échéance">À l'échéance</option>
+                      <option value="Zéro coupon">Zéro coupon</option>
+                    </select>
                   </div>
 
                   <div className="form-section-title">Émetteurs et disponibilité</div>

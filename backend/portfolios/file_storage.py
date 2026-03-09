@@ -18,6 +18,210 @@ TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.json")
 CASH_FILE = os.path.join(DATA_DIR, "cash.json")
 TARGET_PORTFOLIOS_FILE = os.path.join(DATA_DIR, "target_portfolios.json")
 SIGNALETIQUE_FILE = os.path.join(DATA_DIR, "signaletique.json")
+PRIX_HISTORIQUE_KOALA_FILE = os.path.join(DATA_DIR, "prix_historique_koala.json")
+PRIX_HISTORIQUE_BONOBO_FILE = os.path.join(DATA_DIR, "prix_historique_bonobo.json")
+
+
+# ---------------------------------------------------------------------------
+# Historique de prix – Import source Koala
+# ---------------------------------------------------------------------------
+
+def get_prix_historique_koala() -> Dict:
+    """Retourne tout l'historique de prix Koala (dict identifiant → [entrées])"""
+    return _read_json_file(PRIX_HISTORIQUE_KOALA_FILE, {})
+
+
+def get_prix_historique_bonobo() -> Dict:
+    """Retourne tout l'historique de prix Bonobo (dict identifiant → [entrées])"""
+    return _read_json_file(PRIX_HISTORIQUE_BONOBO_FILE, {})
+
+
+def append_prix_bonobo(rows: List[Dict]) -> Dict:
+    """
+    Ajoute des entrées dans l'historique Bonobo.
+    rows: liste de {isin, cours, devise, date_import}
+    Retourne des stats {ajoutés, ignorés}.
+    Un seul prix par (isin, date_import) — le dernier reçu écrase le précédent.
+    """
+    historique = _read_json_file(PRIX_HISTORIQUE_BONOBO_FILE, {})
+    ajoutes = 0
+    ignores = 0
+    for row in rows:
+        isin = str(row.get('isin', '')).strip()
+        cours = row.get('cours')
+        if not isin or cours is None:
+            ignores += 1
+            continue
+        entree = {
+            'cours': float(cours),
+            'date_import': row.get('date_import', datetime.now().date().isoformat()),
+            'devise': row.get('devise', 'EUR'),
+        }
+        if isin not in historique:
+            historique[isin] = []
+        # Dédoublonnage : remplace l'entrée de même date si elle existe déjà
+        date_cle = entree['date_import']
+        historique[isin] = [e for e in historique[isin] if e.get('date_import') != date_cle]
+        historique[isin].append(entree)
+        ajoutes += 1
+    _write_json_file(PRIX_HISTORIQUE_BONOBO_FILE, historique)
+    return {'ajoutes': ajoutes, 'ignores': ignores}
+
+
+def append_prix_koala(rows: List[Dict]) -> Dict:
+    """
+    Ajoute des entrées dans l'historique Koala.
+    rows: liste de {symbole, cours, date_import, devise}
+    Retourne des stats {ajoutés, ignorés}.
+    Un seul prix par (symbole, date_import) — le dernier reçu écrase le précédent.
+    """
+    historique = _read_json_file(PRIX_HISTORIQUE_KOALA_FILE, {})
+    ajoutes = 0
+    ignores = 0
+    for row in rows:
+        symbole = str(row.get('symbole', '')).strip()
+        cours = row.get('cours')
+        if not symbole or cours is None:
+            ignores += 1
+            continue
+        entree = {
+            'cours': float(cours),
+            'date_import': row.get('date_import', datetime.now().date().isoformat()),
+            'devise': row.get('devise', 'EUR'),
+        }
+        if symbole not in historique:
+            historique[symbole] = []
+        # Dédoublonnage : remplace l'entrée de même date si elle existe déjà
+        date_cle = entree['date_import']
+        historique[symbole] = [e for e in historique[symbole] if e.get('date_import') != date_cle]
+        historique[symbole].append(entree)
+        ajoutes += 1
+    _write_json_file(PRIX_HISTORIQUE_KOALA_FILE, historique)
+    return {'ajoutes': ajoutes, 'ignores': ignores}
+
+
+# ---------------------------------------------------------------------------
+# Historique de prix – consolidé par titre (Koala + Bonobo → prix_historique_titres)
+# ---------------------------------------------------------------------------
+
+PRIX_HISTORIQUE_TITRES_FILE = os.path.join(DATA_DIR, "prix_historique_titres.json")
+
+
+def get_prix_historique_titres() -> Dict:
+    """Retourne l'historique consolidé de prix par ISIN"""
+    return _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {})
+
+
+def get_prix_titre_by_isin(isin: str) -> Optional[Dict]:
+    """Retourne l'historique de prix pour un titre donné par ISIN"""
+    return _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {}).get(isin)
+
+
+def rebuild_prix_historique_titres() -> Dict:
+    """
+    Consolide les historiques Koala (par Symbole) et Bonobo (par ISIN)
+    vers prix_historique_titres.json, clé = ISIN.
+    - Koala  : match par donnees_supplementaires['Symbole']
+    - Bonobo : match par signaletique.isin
+    - Devise '%' (Bonobo) : remplacée par la devise de référence du titre
+    """
+    sigs = get_all_signaletiques()
+    koala = _read_json_file(PRIX_HISTORIQUE_KOALA_FILE, {})
+    bonobo = _read_json_file(PRIX_HISTORIQUE_BONOBO_FILE, {})
+
+    # Index signaletiques par ISIN
+    isin_to_sig = {sig['isin']: sig for sig in sigs if sig.get('isin')}
+
+    # Index signaletiques par Symbole (champ dans donnees_supplementaires)
+    symbole_to_sig = {}
+    for sig in sigs:
+        ds = sig.get('donnees_supplementaires') or {}
+        symbole = ds.get('Symbole') or ds.get('CodeBank')
+        if symbole and str(symbole).strip():
+            symbole_to_sig[str(symbole).strip()] = sig
+
+    titres: Dict = {}
+
+    def _get_or_create(isin, sig):
+        if isin not in titres:
+            ds = sig.get('donnees_supplementaires') or {}
+            devise_ref = str(ds.get('Devise') or 'EUR').strip()
+            titres[isin] = {
+                'isin': isin,
+                'nom': sig.get('titre', ''),
+                'signaletique_id': sig.get('id'),
+                'devise_ref': devise_ref,
+                'historique': [],
+            }
+        return titres[isin]
+
+    # ── Koala ──
+    for symbole, entries in koala.items():
+        sig = symbole_to_sig.get(symbole)
+        if not sig:
+            continue
+        isin = sig.get('isin') or f"SYM_{symbole}"
+        titre = _get_or_create(isin, sig)
+        devise_ref = titre['devise_ref']
+        for idx, entry in enumerate(entries):
+            titre['historique'].append({
+                'id': f"{isin}_{entry.get('date_import', '')}_{idx}_koala",
+                'date': entry.get('date_import', ''),
+                'cours': entry.get('cours'),
+                'devise': entry.get('devise') or devise_ref,
+                'source': 'koala',
+                'symbole': symbole,
+            })
+
+    # ── Bonobo ──
+    for isin, entries in bonobo.items():
+        sig = isin_to_sig.get(isin)
+        if sig:
+            titre = _get_or_create(isin, sig)
+        else:
+            if isin not in titres:
+                titres[isin] = {
+                    'isin': isin,
+                    'nom': isin,
+                    'signaletique_id': None,
+                    'devise_ref': 'EUR',
+                    'historique': [],
+                }
+            titre = titres[isin]
+        devise_ref = titre['devise_ref']
+        for idx, entry in enumerate(entries):
+            devise = str(entry.get('devise') or 'EUR').strip()
+            if devise == '%':
+                devise = devise_ref
+            titre['historique'].append({
+                'id': f"{isin}_{entry.get('date_import', '')}_{idx}_bonobo",
+                'date': entry.get('date_import', ''),
+                'cours': entry.get('cours'),
+                'devise': devise,
+                'source': 'bonobo',
+            })
+
+    # Tri par date puis dédoublonnage : un seul prix par date (le dernier source gagne — Bonobo > Koala)
+    for isin in titres:
+        titres[isin]['historique'].sort(key=lambda x: x.get('date') or '')
+        par_date: Dict = {}
+        for entry in titres[isin]['historique']:
+            par_date[entry.get('date') or ''] = entry  # écrase si même date → dernier gagne
+        titres[isin]['historique'] = list(par_date.values())
+
+    _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+    return {
+        'titres_consolides': len(titres),
+        'total_entrees': sum(len(t['historique']) for t in titres.values()),
+        'koala_matches': sum(
+            1 for t in titres.values()
+            if any(e['source'] == 'koala' for e in t['historique'])
+        ),
+        'bonobo_matches': sum(
+            1 for t in titres.values()
+            if any(e['source'] == 'bonobo' for e in t['historique'])
+        ),
+    }
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -90,25 +294,41 @@ def get_portfolio_by_name(name: str) -> Optional[Dict]:
     return None
 
 
-def create_portfolio(name: str, description: str = None) -> Dict:
-    """Crée un nouveau portefeuille"""
+def create_portfolio(name: str, description: str = None,
+                     type_compte: str = None, courtier: str = None,
+                     devise: str = 'EUR', date_ouverture: str = None,
+                     couleur: str = None) -> Dict:
+    """Crée un nouveau portefeuille réel.
+
+    Champs disponibles :
+      name           – nom unique (obligatoire)
+      description    – description libre
+      type_compte    – ex. PEA, CTO, Assurance-vie, PER, Autre
+      courtier       – ex. Boursorama, Degiro, Saxo …
+      devise         – devise de référence (défaut EUR)
+      date_ouverture – date ISO d'ouverture du compte
+      couleur        – couleur d'affichage en hex (#RRGGBB)
+    """
     portfolios = get_all_portfolios()
-    
-    # Vérifier si le nom existe déjà
+
     if any(p.get('name') == name for p in portfolios):
         raise ValueError(f"Un portefeuille avec le nom '{name}' existe déjà")
-    
+
     new_portfolio = {
         'id': _get_next_id(portfolios),
         'name': name,
         'description': description,
+        'type_compte': type_compte,
+        'courtier': courtier,
+        'devise': devise or 'EUR',
+        'date_ouverture': date_ouverture,
+        'couleur': couleur,
         'date_creation': datetime.now().isoformat(),
-        'date_modification': datetime.now().isoformat()
+        'date_modification': datetime.now().isoformat(),
     }
-    
+
     portfolios.append(new_portfolio)
     _write_json_file(PORTFOLIOS_FILE, portfolios)
-    
     return new_portfolio
 
 
@@ -159,15 +379,27 @@ def delete_portfolio(portfolio_id: int) -> bool:
 
 
 def get_or_create_portfolio(name: str, defaults: Dict = None) -> tuple[Dict, bool]:
-    """Récupère ou crée un portefeuille (similaire à Django get_or_create)"""
+    """Récupère ou crée un portefeuille.
+
+    defaults peut contenir n'importe quel champ de create_portfolio :
+      description, type_compte, courtier, devise, date_ouverture, couleur.
+    Utilisé lors des imports/restaurations pour propager les métadonnées
+    même quand le portefeuille est créé à la volée.
+    """
     portfolio = get_portfolio_by_name(name)
-    
     if portfolio:
         return portfolio, False
-    
-    # Créer le portefeuille
-    description = defaults.get('description') if defaults else None
-    new_portfolio = create_portfolio(name, description)
+
+    d = defaults or {}
+    new_portfolio = create_portfolio(
+        name=name,
+        description=d.get('description'),
+        type_compte=d.get('type_compte'),
+        courtier=d.get('courtier'),
+        devise=d.get('devise', 'EUR'),
+        date_ouverture=d.get('date_ouverture'),
+        couleur=d.get('couleur'),
+    )
     return new_portfolio, True
 
 

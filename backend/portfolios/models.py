@@ -45,7 +45,16 @@ class Signaletique(models.Model):
         verbose_name="Catégorie"
     )
     statut = models.CharField(max_length=100, blank=True, null=True, verbose_name="Statut")
-    
+
+    # Prix / Cours
+    prix = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name="Prix / Cours")
+    devise_prix = models.CharField(max_length=10, blank=True, null=True, verbose_name="Devise du prix")
+    source_prix = models.CharField(max_length=200, blank=True, null=True, verbose_name="Source du prix")
+    date_cours = models.DateField(blank=True, null=True, verbose_name="Date du cours")
+
+    # Fréquence coupon (champ dédié)
+    frequence_coupon = models.CharField(max_length=50, blank=True, null=True, verbose_name="Fréquence coupon")
+
     # Métadonnées
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)

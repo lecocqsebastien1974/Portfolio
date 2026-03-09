@@ -42,6 +42,7 @@ services:
       - ./backend:/app
       - ./data:/app/data
       - ./Sauvegarde:/app/sauvegarde
+      - ./Start Files:/app/startfiles
       - portfolio_static_volume:/app/staticfiles
       - portfolio_media_volume:/app/media
     ports:
