@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Signaletique, ImportLog
+from .models import Signaletique, ImportLog, Cash
 
 @admin.register(Signaletique)
 class SignaletiqueAdmin(admin.ModelAdmin):
@@ -13,3 +13,10 @@ class ImportLogAdmin(admin.ModelAdmin):
     list_display = ('type_import', 'nom_fichier', 'nombre_lignes', 'nombre_succes', 'nombre_erreurs', 'statut', 'date_import')
     list_filter = ('type_import', 'statut', 'date_import')
     readonly_fields = ('date_import',)
+
+@admin.register(Cash)
+class CashAdmin(admin.ModelAdmin):
+    list_display = ('portfolio', 'banque', 'montant', 'devise', 'date', 'date_creation')
+    list_filter = ('portfolio', 'banque', 'devise', 'date')
+    search_fields = ('banque', 'commentaire')
+    readonly_fields = ('date_creation', 'date_modification')

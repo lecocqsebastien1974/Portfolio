@@ -175,3 +175,30 @@ class Transaction(models.Model):
     
     def __str__(self):
         return f"{self.type_operation} {self.quantite} {self.signaletique.code} @ {self.prix_unitaire} ({self.date})"
+
+
+class Cash(models.Model):
+    """Solde de cash par portefeuille et banque"""
+    portfolio = models.ForeignKey(
+        RealPortfolio,
+        on_delete=models.CASCADE,
+        related_name='cash_entries',
+        verbose_name="Portefeuille"
+    )
+    banque = models.CharField(max_length=200, verbose_name="Banque")
+    montant = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant")
+    devise = models.CharField(max_length=10, default='EUR', verbose_name="Devise")
+    date = models.DateField(verbose_name="Date")
+    commentaire = models.TextField(blank=True, null=True, verbose_name="Commentaire")
+    
+    # Métadonnées
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Cash"
+        verbose_name_plural = "Cash"
+        ordering = ['-date', '-date_creation']
+    
+    def __str__(self):
+        return f"{self.portfolio.name} - {self.banque}: {self.montant} {self.devise} ({self.date})"

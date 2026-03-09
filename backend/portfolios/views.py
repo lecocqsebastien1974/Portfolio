@@ -12,13 +12,14 @@ import os
 from datetime import date, datetime
 from decimal import Decimal
 from django.conf import settings
-from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction, AssetCategory
+from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction, AssetCategory, Cash
 from .serializers import (
     SignaletiqueSerializer,
     ImportLogSerializer,
     TargetPortfolioSerializer,
     RealPortfolioSerializer,
-    TransactionSerializer
+    TransactionSerializer,
+    CashSerializer
 )
 
 @api_view(['GET'])
@@ -167,21 +168,17 @@ def import_signaletique(request):
                     continue
 
                 if isin_value:
-                    # Ne rien faire si le titre existe déjà (pas de mise à jour)
-                    if Signaletique.objects.filter(isin=isin_value).exists():
-                        # Titre déjà existant, on le skip
-                        nombre_ignores += 1
-                        continue
-                    else:
-                        # Créer le nouveau titre
-                        signaletique = Signaletique.objects.create(**defaults)
+                    # Mettre à jour ou créer le titre avec l'ISIN
+                    signaletique, created = Signaletique.objects.update_or_create(
+                        isin=isin_value,
+                        defaults=defaults
+                    )
                 else:
-                    # Sans ISIN, vérifier par code
-                    if Signaletique.objects.filter(code=str(code)).exists():
-                        nombre_ignores += 1
-                        continue
-                    else:
-                        signaletique = Signaletique.objects.create(**defaults)
+                    # Sans ISIN, mettre à jour ou créer par code
+                    signaletique, created = Signaletique.objects.update_or_create(
+                        code=str(code),
+                        defaults=defaults
+                    )
                 
                 nombre_succes += 1
                 
@@ -420,6 +417,57 @@ def real_portfolio_detail(request, pk):
         portfolio.delete()
         return Response(
             {'success': True, 'message': 'Portefeuille supprime'},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+@api_view(['GET', 'POST'])
+def list_cash(request):
+    """Liste ou crée des entrées de cash"""
+    if request.method == 'GET':
+        # Optionnel: filtrer par portfolio si fourni dans les params
+        portfolio_id = request.query_params.get('portfolio_id', None)
+        if portfolio_id:
+            cash_entries = Cash.objects.filter(portfolio_id=portfolio_id)
+        else:
+            cash_entries = Cash.objects.all()
+        serializer = CashSerializer(cash_entries, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = CashSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def cash_detail(request, pk):
+    """Récupère, modifie ou supprime une entrée de cash"""
+    try:
+        cash = Cash.objects.get(pk=pk)
+    except Cash.DoesNotExist:
+        return Response(
+            {'error': 'Entree de cash non trouvee'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = CashSerializer(cash)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = CashSerializer(cash, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        cash.delete()
+        return Response(
+            {'success': True, 'message': 'Entree de cash supprimee'},
             status=status.HTTP_204_NO_CONTENT
         )
 

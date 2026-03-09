@@ -31,6 +31,7 @@ function SignaletiqueList() {
     Taux: '',
     Positions: '',
     'Date de fin': '',
+    'Frequence Coupon': '',
     Replication: '',
     'Qualité credit': '',
     'Taille du Fonds': '',
@@ -193,6 +194,7 @@ function SignaletiqueList() {
       Taux: ds['Taux'] || '',
       Positions: ds['Positions'] || '',
       'Date de fin': ds['Date de fin'] || '',
+      'Frequence Coupon': ds['Frequence Coupon'] || '',
       Replication: ds['Replication'] || '',
       'Qualité credit': ds['Qualité credit'] || '',
       'Taille du Fonds': ds['Taille du Fonds'] || '',
@@ -490,6 +492,7 @@ function SignaletiqueList() {
                           { label: 'Taux (%)', keys: ['Taux (%)', 'Taux %', 'Taux'] },
                           { label: 'Positions', keys: ['Positions'] },
                           { label: 'Date de fin', keys: ['Date de fin'] },
+                          { label: 'Fréquence Coupon', keys: ['Frequence Coupon', 'Fréquence Coupon'] },
                           { label: 'Réplication', keys: ['Réplication', 'Replication'] },
                           { label: 'Qualité crédit', keys: ['Qualité crédit', 'Qualité credit', 'Qualite crédit', 'Qualite credit'] },
                           { label: 'Taille du Fonds', keys: ['Taille du Fonds'] },
@@ -668,6 +671,21 @@ function SignaletiqueList() {
                       onChange={(e) => setFormData({...formData, 'Date de fin': e.target.value})}
                       className="form-input"
                     />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Fréquence Coupon</label>
+                    <select
+                      value={formData['Frequence Coupon']}
+                      onChange={(e) => setFormData({...formData, 'Frequence Coupon': e.target.value})}
+                      className="form-input"
+                    >
+                      <option value="">-- Sélectionner --</option>
+                      <option value="Annuelle">Annuelle</option>
+                      <option value="Semi-annuelle">Semi-annuelle</option>
+                      <option value="Trimestrielle">Trimestrielle</option>
+                      <option value="Mensuelle">Mensuelle</option>
+                    </select>
                   </div>
 
                   <div className="form-group">

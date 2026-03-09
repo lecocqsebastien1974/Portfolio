@@ -17,6 +17,9 @@ function PortfolioAnalysis() {
   const [showImmobilierDetail, setShowImmobilierDetail] = useState(false);
   const [showLongShortDetail, setShowLongShortDetail] = useState(false);
   const [showMatieresDetail, setShowMatieresDetail] = useState(false);
+  const [showSignaletiqueModal, setShowSignaletiqueModal] = useState(false);
+  const [selectedSignaletique, setSelectedSignaletique] = useState(null);
+  const [loadingSignaletique, setLoadingSignaletique] = useState(false);
 
   const apiBaseUrl = process.env.REACT_APP_API_URL || window.location.origin;
 
@@ -78,6 +81,30 @@ function PortfolioAnalysis() {
     return new Date(dateStr).toLocaleDateString('fr-FR');
   };
 
+  const openSignaletiqueModal = async (signaletiqueId) => {
+    if (!signaletiqueId) {
+      alert('Aucune signalétique associée à ce titre');
+      return;
+    }
+    
+    setShowSignaletiqueModal(true);
+    setLoadingSignaletique(true);
+    setSelectedSignaletique(null);
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/signaletique/${signaletiqueId}/`);
+      if (!response.ok) throw new Error('Erreur lors du chargement de la signalétique');
+      const data = await response.json();
+      setSelectedSignaletique(data);
+    } catch (err) {
+      console.error('Erreur:', err);
+      alert('Impossible de charger la signalétique');
+      setShowSignaletiqueModal(false);
+    } finally {
+      setLoadingSignaletique(false);
+    }
+  };
+
   const isObligation = (categorie, typeInstrument = '') => {
     const catLower = (categorie || '').toLowerCase();
     const typeLower = (typeInstrument || '').toLowerCase();
@@ -90,6 +117,115 @@ function PortfolioAnalysis() {
       return formatNumber(value, 2) + ' %';
     }
     return formatCurrency(value, devise);
+  };
+
+  const calculateInteretsCourus = (position) => {
+    // Calculer les intérêts courus pour une obligation
+    if (!isObligation(position.categorie, position.type_instrument)) {
+      return null;
+    }
+
+    try {
+      // Récupérer le taux de coupon depuis les données supplémentaires
+      const taux = getValue(position.donnees_supplementaires, 'Taux');
+      
+      if (!taux || taux === 0) {
+        return null;
+      }
+
+      // Récupérer la fréquence des coupons (par défaut: Annuelle)
+      const frequenceCoupon = position.donnees_supplementaires?.['Frequence Coupon'] || 'Annuelle';
+      
+      // Déterminer le nombre de mois entre chaque coupon
+      let moisEntreCoupons = 12; // Par défaut: annuel
+      if (frequenceCoupon.toLowerCase().includes('trimestriel')) {
+        moisEntreCoupons = 3;
+      } else if (frequenceCoupon.toLowerCase().includes('semi-annuel') || frequenceCoupon.toLowerCase().includes('semestriel')) {
+        moisEntreCoupons = 6;
+      }
+
+      // Récupérer la date de fin (échéance) depuis les données supplémentaires
+      const dateFinStr = position.donnees_supplementaires?.['Date de fin'];
+      
+      if (!dateFinStr) {
+        return null;
+      }
+
+      // Parser la date d'échéance (format: DD/MM/YYYY ou YYYY-MM-DD)
+      let dateEcheance;
+      if (dateFinStr.includes('/')) {
+        const [jour, mois, annee] = dateFinStr.split('/');
+        dateEcheance = { jour: parseInt(jour), mois: parseInt(mois) - 1 };
+      } else if (dateFinStr.includes('-')) {
+        const [annee, mois, jour] = dateFinStr.split('-');
+        dateEcheance = { jour: parseInt(jour), mois: parseInt(mois) - 1 };
+      } else {
+        return null;
+      }
+
+      // Date actuelle
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      
+      // Trouver le dernier coupon payé
+      let dateDernierCoupon = null;
+      
+      // Générer toutes les dates de coupons possibles pour les 2 dernières années
+      const datesCoupons = [];
+      for (let annee = currentYear - 1; annee <= currentYear + 1; annee++) {
+        let moisCoupon = dateEcheance.mois;
+        // Générer tous les coupons de l'année selon la fréquence
+        while (moisCoupon >= 0) {
+          datesCoupons.push(new Date(annee, moisCoupon, dateEcheance.jour));
+          moisCoupon -= moisEntreCoupons;
+        }
+        // Aussi checker les mois après le mois d'échéance
+        moisCoupon = dateEcheance.mois + moisEntreCoupons;
+        while (moisCoupon < 12) {
+          datesCoupons.push(new Date(annee, moisCoupon, dateEcheance.jour));
+          moisCoupon += moisEntreCoupons;
+        }
+      }
+      
+      // Trier les dates de coupons et trouver le dernier coupon passé
+      datesCoupons.sort((a, b) => a - b);
+      for (let dateCoupon of datesCoupons) {
+        if (dateCoupon <= now) {
+          dateDernierCoupon = dateCoupon;
+        } else {
+          break;
+        }
+      }
+      
+      if (!dateDernierCoupon) {
+        return null;
+      }
+      
+      // Calculer le nombre de jours écoulés depuis le dernier coupon
+      const joursEcoules = Math.floor((now - dateDernierCoupon) / (1000 * 60 * 60 * 24));
+      
+      // Calculer le nombre de jours dans la période de coupon
+      const indexDernierCoupon = datesCoupons.indexOf(dateDernierCoupon);
+      const prochainCoupon = datesCoupons[indexDernierCoupon + 1];
+      const joursDansPeriode = prochainCoupon 
+        ? Math.floor((prochainCoupon - dateDernierCoupon) / (1000 * 60 * 60 * 24))
+        : 365;
+      
+      // Ajuster le taux pour la fréquence des coupons
+      const tauxPeriode = taux / (12 / moisEntreCoupons);
+      
+      // Intérêts courus en % = (Taux de la période * Jours écoulés) / Jours dans la période
+      const interetsCourusPct = (tauxPeriode * joursEcoules) / joursDansPeriode;
+      
+      // Convertir en montant en devise: Intérêts % × Quantité
+      // (car pour les obligations, le prix de base est 100, donc 1% = 1 unité par titre)
+      const montantInteretsCourus = (interetsCourusPct * position.quantite) / 100;
+      
+      return montantInteretsCourus;
+    } catch (error) {
+      console.error('Erreur calcul intérêts courus:', error);
+      return null;
+    }
   };
 
   const totalValeurPortefeuille = analysis?.positions_actuelles?.reduce(
@@ -381,6 +517,7 @@ function PortfolioAnalysis() {
                                     <Th>ISIN</Th>
                                     <Th align="right">Quantité</Th>
                                     <Th align="right">Prix moyen</Th>
+                                    {isObligation(categorie) && <Th align="right">Intérêts courus</Th>}
                                     <Th align="right">Valeur</Th>
                                     <Th align="right">% portef.</Th>
                                   </tr>
@@ -389,13 +526,25 @@ function PortfolioAnalysis() {
                                   {positions.sort((a, b) => b.valeur - a.valeur).map((pos, i) => {
                                     const pct = totalValeurPortefeuille > 0
                                       ? (pos.valeur / totalValeurPortefeuille * 100).toFixed(1) : '0.0';
+                                    const interetsCourus = calculateInteretsCourus(pos);
                                     return (
                                       <tr key={pos.isin} style={{ backgroundColor: i % 2 === 0 ? '#2c3e50' : '#34495e' }}>
-                                        <Td>{pos.titre}</Td>
+                                        <Td 
+                                          style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                          onClick={() => openSignaletiqueModal(pos.signaletique_id)}
+                                          title="Cliquer pour voir la signalétique"
+                                        >
+                                          {pos.titre}
+                                        </Td>
                                         <Td color="#3498db">{pos.type_instrument || '-'}</Td>
                                         <Td mono>{pos.isin}</Td>
                                         <Td align="right">{formatNumber(pos.quantite)}</Td>
                                         <Td align="right">{formatPrice(pos.prix_moyen, pos.devise, pos.categorie, pos.type_instrument)}</Td>
+                                        {isObligation(categorie) && (
+                                          <Td align="right" color="#e67e22">
+                                            {interetsCourus !== null ? formatCurrency(interetsCourus, pos.devise) : '-'}
+                                          </Td>
+                                        )}
                                         <Td align="right" bold>{formatCurrency(pos.valeur, pos.devise)}</Td>
                                         <Td align="right" color="#3498db">{pct}%</Td>
                                       </tr>
@@ -597,7 +746,140 @@ function PortfolioAnalysis() {
             calculateRepartition={calculateRepartition}
             getValue={getValue}
           />
-        )}      </header>
+        )}      
+        
+        {/* Modal de signalétique */}
+        {showSignaletiqueModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}>
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '12px',
+              padding: '30px',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative',
+              border: '2px solid #667eea'
+            }}>
+              <button
+                onClick={() => setShowSignaletiqueModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '15px',
+                  right: '15px',
+                  background: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '35px',
+                  height: '35px',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  fontWeight: 'bold'
+                }}
+              >
+                ×
+              </button>
+
+              <h2 style={{ color: '#667eea', marginBottom: '20px', marginTop: 0 }}>
+                📋 Signalétique du titre
+              </h2>
+
+              {loadingSignaletique ? (
+                <p style={{ textAlign: 'center', padding: '40px' }}>⏳ Chargement...</p>
+              ) : selectedSignaletique ? (
+                <div>
+                  <div style={{ 
+                    backgroundColor: '#2c3e50', 
+                    padding: '20px', 
+                    borderRadius: '8px',
+                    marginBottom: '20px'
+                  }}>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#3498db' }}>
+                      {selectedSignaletique.titre}
+                    </h3>
+                    <p style={{ margin: '5px 0', color: '#bdc3c7' }}>
+                      <strong>Code:</strong> {selectedSignaletique.code}
+                    </p>
+                    {selectedSignaletique.isin && (
+                      <p style={{ margin: '5px 0', color: '#bdc3c7' }}>
+                        <strong>ISIN:</strong> {selectedSignaletique.isin}
+                      </p>
+                    )}
+                    {selectedSignaletique.categorie_text && (
+                      <p style={{ margin: '5px 0', color: '#bdc3c7' }}>
+                        <strong>Catégorie:</strong> {selectedSignaletique.categorie_text}
+                      </p>
+                    )}
+                    {selectedSignaletique.statut && (
+                      <p style={{ margin: '5px 0', color: '#bdc3c7' }}>
+                        <strong>Type d'instrument:</strong> {selectedSignaletique.statut}
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedSignaletique.donnees_supplementaires && Object.keys(selectedSignaletique.donnees_supplementaires).length > 0 && (
+                    <div>
+                      <h4 style={{ color: '#e67e22', marginBottom: '15px' }}>
+                        Données supplémentaires
+                      </h4>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                        gap: '15px'
+                      }}>
+                        {Object.entries(selectedSignaletique.donnees_supplementaires)
+                          .filter(([key]) => !['code', 'Code', 'Nom', 'Isin', 'ISIN'].includes(key))
+                          .map(([key, value]) => (
+                            <div 
+                              key={key}
+                              style={{
+                                backgroundColor: '#34495e',
+                                padding: '12px',
+                                borderRadius: '6px',
+                                borderLeft: '3px solid #3498db'
+                              }}
+                            >
+                              <div style={{ 
+                                fontSize: '12px', 
+                                color: '#95a5a6',
+                                marginBottom: '5px',
+                                fontWeight: 'bold'
+                              }}>
+                                {key}
+                              </div>
+                              <div style={{ color: '#ecf0f1', fontSize: '14px' }}>
+                                {value || '-'}
+                              </div>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p style={{ textAlign: 'center', padding: '40px', color: '#e74c3c' }}>
+                  Aucune donnée disponible
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </header>
     </div>
   );
 }

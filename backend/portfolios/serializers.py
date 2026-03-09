@@ -7,7 +7,8 @@ from .models import (
     TargetPortfolioItem,
     RealPortfolio,
     Transaction,
-    AssetCategory
+    AssetCategory,
+    Cash
 )
 
 
@@ -171,3 +172,11 @@ class RealPortfolioSerializer(serializers.ModelSerializer):
     class Meta:
         model = RealPortfolio
         fields = ['id', 'name', 'description', 'date_creation', 'date_modification', 'transactions']
+
+
+class CashSerializer(serializers.ModelSerializer):
+    portfolio_name = serializers.CharField(source='portfolio.name', read_only=True)
+    
+    class Meta:
+        model = Cash
+        fields = '__all__'
