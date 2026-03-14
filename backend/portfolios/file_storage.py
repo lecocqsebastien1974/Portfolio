@@ -117,6 +117,123 @@ def get_prix_titre_by_isin(isin: str) -> Optional[Dict]:
     return _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {}).get(isin)
 
 
+def upsert_prix_titre_entry(isin: str, entry: Dict, sig: Optional[Dict] = None) -> Dict:
+    """
+    Ajoute ou met à jour une entrée de prix dans l'historique d'un titre.
+    Si entry contient un 'id' existant, elle est mise à jour ; sinon elle est créée.
+    Retourne l'entrée finale.
+    """
+    titres = _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {})
+    if isin not in titres:
+        nom = sig.get('titre', isin) if sig else isin
+        ds = (sig.get('donnees_supplementaires') or {}) if sig else {}
+        devise_ref = str(ds.get('Devise') or 'EUR').strip()
+        titres[isin] = {
+            'isin': isin,
+            'nom': nom,
+            'signaletique_id': sig.get('id') if sig else None,
+            'devise_ref': devise_ref,
+            'historique': [],
+        }
+
+    historique = titres[isin]['historique']
+    entry_id = entry.get('id')
+
+    if entry_id:
+        for i, e in enumerate(historique):
+            if e.get('id') == entry_id:
+                historique[i] = {**e, **entry}
+                _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+                return historique[i]
+
+    # Nouvelle entrée
+    new_id = f"{isin}_{entry.get('date', '')}_{len(historique)}_manual"
+    new_entry = {
+        'id': new_id,
+        'date': entry.get('date', ''),
+        'cours': entry.get('cours'),
+        'devise': entry.get('devise', 'EUR'),
+        'source': entry.get('source', 'manual'),
+        'symbole': entry.get('symbole', ''),
+    }
+    historique.append(new_entry)
+    historique.sort(key=lambda x: x.get('date') or '')
+    _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+    return new_entry
+
+
+def delete_prix_titre_entry(isin: str, entry_id: str) -> bool:
+    """Supprime une entrée par son id. Retourne True si supprimée, False si introuvable."""
+    titres = _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {})
+    if isin not in titres:
+        return False
+    before = len(titres[isin]['historique'])
+    titres[isin]['historique'] = [e for e in titres[isin]['historique'] if e.get('id') != entry_id]
+    if len(titres[isin]['historique']) == before:
+        return False
+    _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+    return True
+
+
+def import_prix_titre_from_rows(isin: str, rows: List[Dict], sig: Optional[Dict] = None) -> Dict:
+    """
+    Importe une liste de lignes (dict avec date/cours/devise/source/symbole)
+    dans l'historique d'un titre, sans écraser les entrées existantes
+    (dédoublonnage par date+source). Retourne des stats.
+    """
+    titres = _read_json_file(PRIX_HISTORIQUE_TITRES_FILE, {})
+    if isin not in titres:
+        nom = sig.get('titre', isin) if sig else isin
+        ds = (sig.get('donnees_supplementaires') or {}) if sig else {}
+        devise_ref = str(ds.get('Devise') or 'EUR').strip()
+        titres[isin] = {
+            'isin': isin,
+            'nom': nom,
+            'signaletique_id': sig.get('id') if sig else None,
+            'devise_ref': devise_ref,
+            'historique': [],
+        }
+
+    historique = titres[isin]['historique']
+    existing_keys = {(e.get('date'), e.get('source')) for e in historique}
+    ajoutes = 0
+    ignores = 0
+
+    for idx, row in enumerate(rows):
+        date_val = str(row.get('date') or row.get('Date') or '').strip()
+        cours_raw = row.get('cours') or row.get('Cours')
+        if not date_val or cours_raw is None or str(cours_raw).strip() == '':
+            ignores += 1
+            continue
+        try:
+            cours = float(cours_raw)
+        except (TypeError, ValueError):
+            ignores += 1
+            continue
+        source = str(row.get('source') or row.get('Source') or 'import').strip()
+        key = (date_val, source)
+        if key in existing_keys:
+            ignores += 1
+            continue
+        devise = str(row.get('devise') or row.get('Devise') or 'EUR')
+        symbole = str(row.get('symbole') or row.get('Symbole') or '')
+        entry_id = f"{isin}_{date_val}_{len(historique) + ajoutes}_{source}"
+        historique.append({
+            'id': entry_id,
+            'date': date_val,
+            'cours': cours,
+            'devise': devise,
+            'source': source,
+            'symbole': symbole,
+        })
+        existing_keys.add(key)
+        ajoutes += 1
+
+    historique.sort(key=lambda x: x.get('date') or '')
+    _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+    return {'ajoutes': ajoutes, 'ignores': ignores}
+
+
 def rebuild_prix_historique_titres() -> Dict:
     """
     Consolide les historiques Koala (par Symbole) et Bonobo (par ISIN)
@@ -224,6 +341,67 @@ def rebuild_prix_historique_titres() -> Dict:
     }
 
 
+def restore_prix_historique_from_rows(rows: List[Dict]) -> Dict:
+    """
+    Reconstruit prix_historique_titres.json à partir des lignes lues depuis le fichier Excel
+    de sauvegarde (colonnes : ISIN, Nom, Date, Cours, Devise, Source, Symbole).
+    Retourne des stats {ajoutes, ignores, titres}.
+    """
+    titres: Dict = {}
+    sigs = get_all_signaletiques()
+    isin_to_sig = {sig['isin']: sig for sig in sigs if sig.get('isin')}
+
+    ajoutes = 0
+    ignores = 0
+
+    for idx, row in enumerate(rows):
+        isin = str(row.get('ISIN') or '').strip().upper()
+        if not isin:
+            ignores += 1
+            continue
+        nom = str(row.get('Nom') or isin)
+        date_val = str(row.get('Date') or '')
+        cours_raw = row.get('Cours')
+        if cours_raw is None or str(cours_raw).strip() == '':
+            ignores += 1
+            continue
+        try:
+            cours = float(cours_raw)
+        except (TypeError, ValueError):
+            ignores += 1
+            continue
+        devise = str(row.get('Devise') or 'EUR')
+        source = str(row.get('Source') or 'import')
+        symbole = str(row.get('Symbole') or '')
+
+        if isin not in titres:
+            sig = isin_to_sig.get(isin)
+            sig_id = sig['id'] if sig else None
+            ds = (sig.get('donnees_supplementaires') or {}) if sig else {}
+            devise_ref = str(ds.get('Devise') or 'EUR').strip()
+            titres[isin] = {
+                'isin': isin,
+                'nom': sig.get('titre', nom) if sig else nom,
+                'signaletique_id': sig_id,
+                'devise_ref': devise_ref,
+                'historique': [],
+            }
+
+        entry_id = f"{isin}_{date_val}_{idx}_{source}"
+        titres[isin]['historique'].append({
+            'id': entry_id,
+            'date': date_val,
+            'cours': cours,
+            'devise': devise,
+            'source': source,
+            'symbole': symbole,
+        })
+        ajoutes += 1
+
+    _write_json_file(PRIX_HISTORIQUE_TITRES_FILE, titres)
+    return {'ajoutes': ajoutes, 'ignores': ignores, 'titres': len(titres)}
+
+
 class DateTimeEncoder(json.JSONEncoder):
     """Encoder JSON personnalisé pour gérer les types date, datetime et Decimal"""
     
@@ -239,6 +417,17 @@ def ensure_data_dir():
     """Crée le répertoire de données s'il n'existe pas"""
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
+
+
+def list_json_snapshots(directory: str) -> List[str]:
+    """Retourne la liste triée des noms de sous-répertoires de snapshot JSON dans directory."""
+    if not os.path.isdir(directory):
+        return []
+    entries = sorted(
+        name for name in os.listdir(directory)
+        if os.path.isdir(os.path.join(directory, name))
+    )
+    return entries
 
 
 def _read_json_file(filepath: str, default: Any = None) -> Any:

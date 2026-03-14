@@ -2,8 +2,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import AssetCategory
-from .admin_serializers import AssetCategorySerializer, UserSerializer
+from .models import AssetCategory, InstrumentType
+from .admin_serializers import AssetCategorySerializer, InstrumentTypeSerializer, UserSerializer
 
 
 class IsSuperUser(permissions.BasePermission):
@@ -18,6 +18,14 @@ class AssetCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = AssetCategorySerializer
     permission_classes = [IsSuperUser]
     pagination_class = None  # Désactiver la pagination
+
+
+class InstrumentTypeViewSet(viewsets.ModelViewSet):
+    """ViewSet pour gérer les types d'instruments"""
+    queryset = InstrumentType.objects.all()
+    serializer_class = InstrumentTypeSerializer
+    permission_classes = [IsSuperUser]
+    pagination_class = None
 
 
 class UserManagementViewSet(viewsets.ModelViewSet):

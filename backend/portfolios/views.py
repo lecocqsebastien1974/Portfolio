@@ -12,7 +12,7 @@ import os
 from datetime import date, datetime
 from decimal import Decimal
 from django.conf import settings
-from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction, AssetCategory, Cash
+from .models import Signaletique, ImportLog, TargetPortfolio, RealPortfolio, Transaction, AssetCategory, InstrumentType, Cash
 from .serializers import (
     SignaletiqueSerializer,
     ImportLogSerializer,
@@ -41,6 +41,22 @@ def list_categories(request):
             'ordre': cat.ordre
         }
         for cat in categories
+    ])
+
+
+@api_view(['GET'])
+def list_instrument_types(request):
+    """Liste tous les types d'instruments disponibles"""
+    types = InstrumentType.objects.all().order_by('ordre', 'name')
+    return Response([
+        {
+            'id': t.id,
+            'name': t.name,
+            'description': t.description,
+            'color': t.color,
+            'ordre': t.ordre
+        }
+        for t in types
     ])
 
 
@@ -163,6 +179,14 @@ def import_signaletique(request):
                     categorie_instance, _ = AssetCategory.objects.get_or_create(
                         name=categorie_text,
                         defaults={'description': 'Catégorie créée automatiquement lors de l\'import'}
+                    )
+
+                # Créer automatiquement le type d'instrument si nouveau
+                statut_normalized = str(statut_data).strip().capitalize() if statut_data and str(statut_data).strip() else None
+                if statut_normalized:
+                    InstrumentType.objects.get_or_create(
+                        name__iexact=statut_normalized,
+                        defaults={'name': statut_normalized, 'description': 'Créé automatiquement lors de l\'import'}
                     )
 
                 db_defaults = {
@@ -610,6 +634,144 @@ def titre_price_history(request, isin):
     return Response(data)
 
 
+@api_view(['GET'])
+def list_prix_historique(request):
+    """Liste tous les ISIN ayant un historique de prix (GET /api/prix-historique/)."""
+    titres = file_storage.get_prix_historique_titres()
+    result = []
+    for isin, data in sorted(titres.items()):
+        result.append({
+            'isin': isin,
+            'nom': data.get('nom', isin),
+            'devise_ref': data.get('devise_ref', 'EUR'),
+            'nb_entrees': len(data.get('historique') or []),
+            'derniere_date': max(
+                (e.get('date') or '' for e in (data.get('historique') or [])),
+                default=None
+            ),
+            'dernier_cours': next(
+                (e.get('cours') for e in sorted(
+                    data.get('historique') or [],
+                    key=lambda x: x.get('date') or '',
+                    reverse=True
+                )), None
+            ),
+        })
+    return Response(result)
+
+
+@api_view(['POST'])
+def add_prix_entry(request, isin):
+    """
+    Ajoute ou met à jour une entrée de prix pour un titre.
+    POST /api/prix-historique/<isin>/entries/
+    Body JSON: {date, cours, devise, source, symbole, id (optionnel pour update)}
+    """
+    body = request.data
+    date_val = str(body.get('date') or '').strip()
+    cours_raw = body.get('cours')
+    if not date_val:
+        return Response({'error': 'Le champ date est requis'}, status=status.HTTP_400_BAD_REQUEST)
+    if cours_raw is None or str(cours_raw).strip() == '':
+        return Response({'error': 'Le champ cours est requis'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        cours = float(cours_raw)
+    except (TypeError, ValueError):
+        return Response({'error': 'cours doit être un nombre'}, status=status.HTTP_400_BAD_REQUEST)
+
+    entry = {
+        'id': body.get('id') or None,
+        'date': date_val,
+        'cours': cours,
+        'devise': str(body.get('devise') or 'EUR'),
+        'source': str(body.get('source') or 'manual'),
+        'symbole': str(body.get('symbole') or ''),
+    }
+    sig = file_storage.get_signaletique_by_isin(isin)
+    saved = file_storage.upsert_prix_titre_entry(isin, entry, sig=sig)
+    return Response({'success': True, 'entry': saved}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT'])
+def update_prix_entry(request, isin, entry_id):
+    """
+    Met à jour une entrée de prix existante.
+    PUT /api/prix-historique/<isin>/entries/<entry_id>/
+    """
+    body = request.data
+    date_val = str(body.get('date') or '').strip()
+    cours_raw = body.get('cours')
+    if not date_val:
+        return Response({'error': 'Le champ date est requis'}, status=status.HTTP_400_BAD_REQUEST)
+    if cours_raw is None or str(cours_raw).strip() == '':
+        return Response({'error': 'Le champ cours est requis'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        cours = float(cours_raw)
+    except (TypeError, ValueError):
+        return Response({'error': 'cours doit être un nombre'}, status=status.HTTP_400_BAD_REQUEST)
+
+    entry = {
+        'id': entry_id,
+        'date': date_val,
+        'cours': cours,
+        'devise': str(body.get('devise') or 'EUR'),
+        'source': str(body.get('source') or 'manual'),
+        'symbole': str(body.get('symbole') or ''),
+    }
+    sig = file_storage.get_signaletique_by_isin(isin)
+    saved = file_storage.upsert_prix_titre_entry(isin, entry, sig=sig)
+    return Response({'success': True, 'entry': saved})
+
+
+@api_view(['DELETE'])
+def delete_prix_entry(request, isin, entry_id):
+    """
+    Supprime une entrée de prix.
+    DELETE /api/prix-historique/<isin>/entries/<entry_id>/
+    """
+    deleted = file_storage.delete_prix_titre_entry(isin, entry_id)
+    if not deleted:
+        return Response({'error': 'Entrée introuvable'}, status=status.HTTP_404_NOT_FOUND)
+    return Response({'success': True})
+
+
+@api_view(['POST'])
+def import_prix_titre(request, isin):
+    """
+    Importe un fichier Excel pour ajouter un historique de prix à un titre.
+    POST /api/prix-historique/<isin>/import/
+    Colonnes attendues : Date, Cours, Devise, Source (optionnel), Symbole (optionnel)
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+    f = request.FILES['file']
+    if not f.name.lower().endswith(('.xlsx', '.xls')):
+        return Response({'error': 'Format non supporté. Utilisez .xlsx ou .xls'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        wb = openpyxl.load_workbook(f, data_only=True)
+        ws = wb.active
+        headers = [str(cell.value or '').strip() for cell in ws[1]]
+        rows = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(c is not None and str(c).strip() != '' for c in row):
+                continue
+            row_dict = {h: v for h, v in zip(headers, row)}
+            # Normaliser la date si c'est un objet datetime/date
+            d = row_dict.get('Date') or row_dict.get('date')
+            if d is not None:
+                from datetime import datetime as _dt, date as _date
+                if isinstance(d, (_dt, _date)):
+                    row_dict['date'] = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+                else:
+                    row_dict['date'] = str(d).strip()
+            rows.append(row_dict)
+        sig = file_storage.get_signaletique_by_isin(isin)
+        stats = file_storage.import_prix_titre_from_rows(isin, rows, sig=sig)
+        return Response({'success': True, 'isin': isin, **stats})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['POST'])
 def backup_all_data(request):
     """Export toutes les données (cash, portefeuilles cibles, transactions, signalétique)
@@ -970,6 +1132,12 @@ def restore_all_data(request):
                         name=categorie_text,
                         defaults={'description': 'Catégorie créée automatiquement lors de la restauration'},
                     )
+                statut_normalized = str(statut_data).strip().capitalize() if statut_data and str(statut_data).strip() else None
+                if statut_normalized:
+                    InstrumentType.objects.get_or_create(
+                        name__iexact=statut_normalized,
+                        defaults={'name': statut_normalized, 'description': 'Créé automatiquement lors de la restauration'}
+                    )
                 if not isin_value and not str(titre).strip():
                     continue
                 db_defaults = {
@@ -1211,6 +1379,30 @@ def restore_all_data(request):
             results['utilisateurs'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(users_path), 'error': str(e)}
     else:
         results['utilisateurs'] = {'error': 'Aucun fichier utilisateurs_*.xlsx trouvé dans Sauvegarde/'}
+
+    # ── 6. PRIX HISTORIQUES ───────────────────────────────────────────────────
+    prix_path = latest_file('prix_historique')
+    if prix_path:
+        try:
+            wb = openpyxl.load_workbook(prix_path)
+            ws = wb.active
+            headers = [str(cell.value or '').strip() for cell in ws[1]]
+            rows_prix = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not any(c is not None and str(c).strip() != '' for c in row):
+                    continue
+                rows_prix.append({h: v for h, v in zip(headers, row)})
+            stats_p = file_storage.restore_prix_historique_from_rows(rows_prix)
+            results['prix_historique'] = {
+                'ajoutes': stats_p['ajoutes'],
+                'ignores': stats_p['ignores'],
+                'titres': stats_p['titres'],
+                'fichier': os.path.basename(prix_path),
+            }
+        except Exception as e:
+            results['prix_historique'] = {'succes': 0, 'erreurs': 1, 'fichier': os.path.basename(prix_path), 'error': str(e)}
+    else:
+        results['prix_historique'] = {'info': 'Aucun fichier prix_historique_*.xlsx trouvé dans Start Files'}
 
     return Response({'success': True, 'details': results})
 

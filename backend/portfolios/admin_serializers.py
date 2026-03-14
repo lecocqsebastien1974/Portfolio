@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import AssetCategory
+from .models import AssetCategory, InstrumentType
 
 
 class AssetCategorySerializer(serializers.ModelSerializer):
@@ -35,6 +35,39 @@ class AssetCategorySerializer(serializers.ModelSerializer):
     def get_signaletiques_count(self, obj):
         """Retourne le nombre de signalétiques dans cette catégorie"""
         return obj.signaletiques.count()
+
+
+class InstrumentTypeSerializer(serializers.ModelSerializer):
+    """Serializer pour les types d'instruments"""
+    signaletiques_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InstrumentType
+        fields = ['id', 'name', 'description', 'color', 'ordre', 'signaletiques_count', 'date_creation', 'date_modification']
+        read_only_fields = ['date_creation', 'date_modification']
+
+    def validate_name(self, value):
+        if value:
+            normalized_name = value.strip().capitalize()
+            existing = InstrumentType.objects.filter(name__iexact=normalized_name)
+            if self.instance:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise serializers.ValidationError(
+                    f"Un type d'instrument avec le nom '{normalized_name}' existe déjà"
+                )
+            return normalized_name
+        return value
+
+    def get_signaletiques_count(self, obj):
+        """Nombre de signalétiques avec ce type d'instrument (statut)"""
+        from . import file_storage
+        all_sigs = file_storage.get_all_signaletiques()
+        count = sum(
+            1 for s in all_sigs
+            if (s.get('statut') or '').strip().lower() == obj.name.strip().lower()
+        )
+        return count
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -14,8 +14,12 @@ function AdminPanel() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showCategoriesFrame, setShowCategoriesFrame] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [instrumentTypes, setInstrumentTypes] = useState([]);
+  const [showInstrumentTypesFrame, setShowInstrumentTypesFrame] = useState(false);
+  const [showInstrumentTypeModal, setShowInstrumentTypeModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [editingInstrumentType, setEditingInstrumentType] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [userImportFile, setUserImportFile] = useState(null);
   const [userImportMessage, setUserImportMessage] = useState('');
@@ -37,6 +41,14 @@ function AdminPanel() {
     name: '',
     description: '',
     color: '#4CAF50',
+    ordre: 1
+  });
+
+  // Formulaire type d'instrument
+  const [instrumentTypeForm, setInstrumentTypeForm] = useState({
+    name: '',
+    description: '',
+    color: '#E67E22',
     ordre: 1
   });
 
@@ -280,6 +292,91 @@ function AdminPanel() {
     setShowCategoryModal(true);
   };
 
+  // ── Types d'instruments ──────────────────────────────────────────────────
+  const handleOpenInstrumentTypes = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('http://localhost:8001/api/admin/instrument-types/', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setInstrumentTypes(Array.isArray(data) ? data : (data.results || []));
+        setShowInstrumentTypesFrame(true);
+      } else {
+        setError('Erreur lors du chargement des types d\'instruments');
+      }
+    } catch (err) {
+      setError('Erreur de connexion');
+    }
+    setLoading(false);
+  };
+
+  const handleSaveInstrumentType = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const url = editingInstrumentType
+        ? `http://localhost:8001/api/admin/instrument-types/${editingInstrumentType.id}/`
+        : 'http://localhost:8001/api/admin/instrument-types/';
+      const method = editingInstrumentType ? 'PUT' : 'POST';
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(instrumentTypeForm)
+      });
+      if (response.ok) {
+        setShowInstrumentTypeModal(false);
+        setEditingInstrumentType(null);
+        setInstrumentTypeForm({ name: '', description: '', color: '#E67E22', ordre: 1 });
+        handleOpenInstrumentTypes();
+      } else {
+        const data = await response.json();
+        setError(JSON.stringify(data));
+      }
+    } catch (err) {
+      setError('Erreur lors de l\'enregistrement');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteInstrumentType = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce type d\'instrument ?')) return;
+    try {
+      const response = await fetch(`http://localhost:8001/api/admin/instrument-types/${id}/`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        handleOpenInstrumentTypes();
+      } else {
+        setError('Erreur lors de la suppression');
+      }
+    } catch (err) {
+      setError('Erreur de connexion');
+    }
+  };
+
+  const openAddInstrumentTypeModal = () => {
+    setEditingInstrumentType(null);
+    setInstrumentTypeForm({ name: '', description: '', color: '#E67E22', ordre: instrumentTypes.length + 1 });
+    setShowInstrumentTypeModal(true);
+  };
+
+  const openEditInstrumentTypeModal = (it) => {
+    setEditingInstrumentType(it);
+    setInstrumentTypeForm({
+      name: it.name,
+      description: it.description || '',
+      color: it.color || '#E67E22',
+      ordre: it.ordre
+    });
+    setShowInstrumentTypeModal(true);
+  };
+
   return (
     <div className="App">
       <div className="admin-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -296,6 +393,9 @@ function AdminPanel() {
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={handleOpenCategories}>
               📁 Catégories d'actifs
+            </button>
+            <button className="btn btn-secondary" onClick={handleOpenInstrumentTypes}>
+              🏷️ Types d'instruments
             </button>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
               <span className="btn btn-secondary" style={{ margin: 0 }}>📥 Restaurer depuis Excel</span>
@@ -611,6 +711,122 @@ function AdminPanel() {
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCategoryModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Frame Types d'instruments */}
+      {showInstrumentTypesFrame && (
+        <div className="modal" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', color: '#333' }}>
+            <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ color: '#333' }}>🏷️ Types d'instruments</h2>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn btn-primary" onClick={openAddInstrumentTypeModal}>
+                  + Nouveau type
+                </button>
+                <button className="btn btn-secondary" onClick={() => setShowInstrumentTypesFrame(false)}>
+                  ← Retour
+                </button>
+              </div>
+            </div>
+            <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', color: '#333' }}>
+              <thead>
+                <tr>
+                  <th style={{ color: 'white' }}>Nom</th>
+                  <th style={{ color: 'white' }}>Description</th>
+                  <th style={{ color: 'white' }}>Couleur</th>
+                  <th style={{ color: 'white' }}>Ordre</th>
+                  <th style={{ color: 'white' }}>Nb titres</th>
+                  <th style={{ color: 'white' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {instrumentTypes.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                      Aucun type d'instrument
+                    </td>
+                  </tr>
+                ) : (
+                  instrumentTypes.map(it => (
+                    <tr key={it.id}>
+                      <td style={{ color: '#333' }}><strong>{it.name}</strong></td>
+                      <td style={{ color: '#666' }}>{it.description}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '30px', height: '30px', backgroundColor: it.color || '#E67E22', borderRadius: '4px', border: '1px solid #ddd' }}></div>
+                          <span style={{ color: '#666' }}>{it.color}</span>
+                        </div>
+                      </td>
+                      <td style={{ color: '#333' }}>{it.ordre}</td>
+                      <td style={{ color: '#333' }}>{it.signaletiques_count || 0}</td>
+                      <td>
+                        <button className="btn btn-small" onClick={() => openEditInstrumentTypeModal(it)} style={{ marginRight: '5px', padding: '5px 10px', fontSize: '0.9rem' }}>✏️</button>
+                        <button className="btn btn-small btn-danger" onClick={() => handleDeleteInstrumentType(it.id)} style={{ padding: '5px 10px', fontSize: '0.9rem' }}>🗑️</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Type d'instrument */}
+      {showInstrumentTypeModal && (
+        <div className="modal" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '500px', width: '100%', color: '#333' }}>
+            <h2 style={{ color: '#333' }}>{editingInstrumentType ? "Modifier type d'instrument" : "Nouveau type d'instrument"}</h2>
+            <form onSubmit={handleSaveInstrumentType}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Nom *</label>
+                <input
+                  type="text"
+                  value={instrumentTypeForm.name}
+                  onChange={e => setInstrumentTypeForm({ ...instrumentTypeForm, name: e.target.value })}
+                  required
+                  placeholder="ex: ETF, Action, Obligation..."
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Description</label>
+                <textarea
+                  value={instrumentTypeForm.description}
+                  onChange={e => setInstrumentTypeForm({ ...instrumentTypeForm, description: e.target.value })}
+                  rows="3"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Couleur</label>
+                <input
+                  type="color"
+                  value={instrumentTypeForm.color}
+                  onChange={e => setInstrumentTypeForm({ ...instrumentTypeForm, color: e.target.value })}
+                  style={{ width: '100%', height: '40px', cursor: 'pointer' }}
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Ordre d'affichage</label>
+                <input
+                  type="number"
+                  value={instrumentTypeForm.ordre}
+                  onChange={e => setInstrumentTypeForm({ ...instrumentTypeForm, ordre: parseInt(e.target.value) })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowInstrumentTypeModal(false)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={loading}>

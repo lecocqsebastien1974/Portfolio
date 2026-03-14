@@ -90,7 +90,14 @@ function Home() {
           d.utilisateurs && !d.utilisateurs.error
             ? `Utilisateurs : ${d.utilisateurs.crees} créés, ${d.utilisateurs.mis_a_jour} mis à jour (${d.utilisateurs.fichier})`
             : `Utilisateurs : ${d.utilisateurs?.error || 'erreur'}`,
-        ];
+          d.prix_historique
+            ? (d.prix_historique.error
+                ? `Prix historiques : ${d.prix_historique.error}`
+                : d.prix_historique.info
+                  ? `Prix historiques : ${d.prix_historique.info}`
+                  : `Prix historiques : ${d.prix_historique.ajoutes} entrées importées, ${d.prix_historique.titres} titres (${d.prix_historique.fichier})`)
+            : null,
+        ].filter(Boolean);
         setRestoreMessage({ type: 'success', lines });
       } else {
         setRestoreMessage({ type: 'error', lines: [`❌ Erreur: ${data.error || 'inconnue'}`] });
@@ -172,6 +179,9 @@ function Home() {
           </Link>
           <Link to="/portfolio-analysis" className="btn btn-home-analysis">
             {t('home.analysisButton')}
+          </Link>
+          <Link to="/prix-historique" className="btn" style={{ backgroundColor: '#8e44ad', color: 'white' }}>
+            📈 Historique des prix
           </Link>
         </div>
 

@@ -27,6 +27,13 @@
         "cours": 71.311,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "FR0010527275_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 71.311,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -234,6 +241,13 @@
         "cours": 7.592,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "LU2314312849_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 7.592,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -246,6 +260,13 @@
       {
         "id": "LU2823898353_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 10.669,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "LU2823898353_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 10.669,
         "devise": "EUR",
         "source": "bonobo"
@@ -264,6 +285,13 @@
         "cours": 63.57,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00B8FHGS14_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 63.57,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -276,6 +304,13 @@
       {
         "id": "IE0008UEVOE0_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 5.675,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "IE0008UEVOE0_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 5.675,
         "devise": "EUR",
         "source": "bonobo"
@@ -294,6 +329,13 @@
         "cours": 6.271,
         "devise": "USD",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00BJ5JPG56_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 6.271,
+        "devise": "USD",
+        "source": "bonobo"
       }
     ]
   },
@@ -306,6 +348,13 @@
       {
         "id": "IE00BDZVH966_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 5.4,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "IE00BDZVH966_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 5.4,
         "devise": "EUR",
         "source": "bonobo"
@@ -324,6 +373,13 @@
         "cours": 30.285,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00BSJCQV56_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 30.285,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -336,6 +392,13 @@
       {
         "id": "US045167DR18_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 99.005,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US045167DR18_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 99.005,
         "devise": "USD",
         "source": "bonobo"
@@ -354,6 +417,21 @@
         "cours": 99.99,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "CA045167FA66_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 99.99,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "CA045167FA66_2026-03-14_2_manual",
+        "date": "2026-03-14",
+        "cours": 101.5,
+        "devise": "EUR",
+        "source": "manual",
+        "symbole": ""
       }
     ]
   },
@@ -366,6 +444,13 @@
       {
         "id": "US298785HM16_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 98.51,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US298785HM16_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 98.51,
         "devise": "USD",
         "source": "bonobo"
@@ -384,6 +469,13 @@
         "cours": 99.985,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "XS1950499712_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 99.985,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -396,6 +488,13 @@
       {
         "id": "US91282CAD39_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 95.62,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US91282CAD39_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 95.62,
         "devise": "USD",
         "source": "bonobo"
@@ -414,6 +513,13 @@
         "cours": 93.485,
         "devise": "NZD",
         "source": "bonobo"
+      },
+      {
+        "id": "NZGOVDT528C6_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 93.485,
+        "devise": "NZD",
+        "source": "bonobo"
       }
     ]
   },
@@ -429,6 +535,13 @@
         "cours": 99.488,
         "devise": "NZD",
         "source": "bonobo"
+      },
+      {
+        "id": "NZGOVDT526C0_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
+        "cours": 99.488,
+        "devise": "NZD",
+        "source": "bonobo"
       }
     ]
   },
@@ -441,6 +554,13 @@
       {
         "id": "LU0099624925_2026-03-09_0_bonobo",
         "date": "2026-03-09",
+        "cours": 46.19,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "LU0099624925_2026-03-14_1_bonobo",
+        "date": "2026-03-14",
         "cours": 46.19,
         "devise": "EUR",
         "source": "bonobo"

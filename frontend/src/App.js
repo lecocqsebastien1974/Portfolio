@@ -16,6 +16,7 @@ import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperUserRoute from './components/SuperUserRoute';
 import AdminPanel from './components/AdminPanel';
+import PrixHistorique from './components/PrixHistorique';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
               <Route path="/signaletique" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/signaletique/import" element={<ProtectedRoute><ImportData /></ProtectedRoute>} />
               <Route path="/signaletique/data" element={<ProtectedRoute><SignaletiqueList /></ProtectedRoute>} />
+              <Route path="/prix-historique" element={<ProtectedRoute><PrixHistorique /></ProtectedRoute>} />
             </Routes>
           </div>
         </Router>

@@ -4,12 +4,22 @@
       "cours": 71.311,
       "date_import": "2026-03-09",
       "devise": "EUR"
+    },
+    {
+      "cours": 71.311,
+      "date_import": "2026-03-14",
+      "devise": "EUR"
     }
   ],
   "LU2314312849": [
     {
       "cours": 7.592,
       "date_import": "2026-03-09",
+      "devise": "EUR"
+    },
+    {
+      "cours": 7.592,
+      "date_import": "2026-03-14",
       "devise": "EUR"
     }
   ],
@@ -18,12 +28,22 @@
       "cours": 10.669,
       "date_import": "2026-03-09",
       "devise": "EUR"
+    },
+    {
+      "cours": 10.669,
+      "date_import": "2026-03-14",
+      "devise": "EUR"
     }
   ],
   "IE00B8FHGS14": [
     {
       "cours": 63.57,
       "date_import": "2026-03-09",
+      "devise": "EUR"
+    },
+    {
+      "cours": 63.57,
+      "date_import": "2026-03-14",
       "devise": "EUR"
     }
   ],
@@ -32,12 +52,22 @@
       "cours": 5.675,
       "date_import": "2026-03-09",
       "devise": "EUR"
+    },
+    {
+      "cours": 5.675,
+      "date_import": "2026-03-14",
+      "devise": "EUR"
     }
   ],
   "IE00BJ5JPG56": [
     {
       "cours": 6.271,
       "date_import": "2026-03-09",
+      "devise": "USD"
+    },
+    {
+      "cours": 6.271,
+      "date_import": "2026-03-14",
       "devise": "USD"
     }
   ],
@@ -46,12 +76,22 @@
       "cours": 5.4,
       "date_import": "2026-03-09",
       "devise": "EUR"
+    },
+    {
+      "cours": 5.4,
+      "date_import": "2026-03-14",
+      "devise": "EUR"
     }
   ],
   "IE00BSJCQV56": [
     {
       "cours": 30.285,
       "date_import": "2026-03-09",
+      "devise": "EUR"
+    },
+    {
+      "cours": 30.285,
+      "date_import": "2026-03-14",
       "devise": "EUR"
     }
   ],
@@ -60,12 +100,22 @@
       "cours": 99.005,
       "date_import": "2026-03-09",
       "devise": "%"
+    },
+    {
+      "cours": 99.005,
+      "date_import": "2026-03-14",
+      "devise": "%"
     }
   ],
   "CA045167FA66": [
     {
       "cours": 99.99,
       "date_import": "2026-03-09",
+      "devise": "%"
+    },
+    {
+      "cours": 99.99,
+      "date_import": "2026-03-14",
       "devise": "%"
     }
   ],
@@ -74,12 +124,22 @@
       "cours": 98.51,
       "date_import": "2026-03-09",
       "devise": "%"
+    },
+    {
+      "cours": 98.51,
+      "date_import": "2026-03-14",
+      "devise": "%"
     }
   ],
   "XS1950499712": [
     {
       "cours": 99.985,
       "date_import": "2026-03-09",
+      "devise": "%"
+    },
+    {
+      "cours": 99.985,
+      "date_import": "2026-03-14",
       "devise": "%"
     }
   ],
@@ -88,12 +148,22 @@
       "cours": 95.62,
       "date_import": "2026-03-09",
       "devise": "%"
+    },
+    {
+      "cours": 95.62,
+      "date_import": "2026-03-14",
+      "devise": "%"
     }
   ],
   "NZGOVDT528C6": [
     {
       "cours": 93.485,
       "date_import": "2026-03-09",
+      "devise": "%"
+    },
+    {
+      "cours": 93.485,
+      "date_import": "2026-03-14",
       "devise": "%"
     }
   ],
@@ -102,12 +172,22 @@
       "cours": 99.488,
       "date_import": "2026-03-09",
       "devise": "%"
+    },
+    {
+      "cours": 99.488,
+      "date_import": "2026-03-14",
+      "devise": "%"
     }
   ],
   "LU0099624925": [
     {
       "cours": 46.19,
       "date_import": "2026-03-09",
+      "devise": "EUR"
+    },
+    {
+      "cours": 46.19,
+      "date_import": "2026-03-14",
       "devise": "EUR"
     }
   ]

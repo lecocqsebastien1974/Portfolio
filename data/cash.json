@@ -20,5 +20,49 @@
     "commentaire": "",
     "date_creation": "2026-03-09T15:17:40.593809",
     "date_modification": "2026-03-09T15:17:40.593814"
+  },
+  {
+    "id": 3,
+    "portfolio_id": 1,
+    "banque": "XYZ",
+    "montant": "2000",
+    "devise": "AUD",
+    "date": "2026-03-09",
+    "commentaire": null,
+    "date_creation": "2026-03-14T10:21:04.189400",
+    "date_modification": "2026-03-14T10:21:04.189404"
+  },
+  {
+    "id": 4,
+    "portfolio_id": 2,
+    "banque": "bp",
+    "montant": "12",
+    "devise": "EUR",
+    "date": "2026-03-09",
+    "commentaire": null,
+    "date_creation": "2026-03-14T10:21:04.194845",
+    "date_modification": "2026-03-14T10:21:04.194849"
+  },
+  {
+    "id": 5,
+    "portfolio_id": 1,
+    "banque": "XYZ",
+    "montant": "2000",
+    "devise": "AUD",
+    "date": "2026-03-09",
+    "commentaire": null,
+    "date_creation": "2026-03-14T10:22:34.755083",
+    "date_modification": "2026-03-14T10:22:34.755087"
+  },
+  {
+    "id": 6,
+    "portfolio_id": 2,
+    "banque": "bp",
+    "montant": "12",
+    "devise": "EUR",
+    "date": "2026-03-09",
+    "commentaire": null,
+    "date_creation": "2026-03-14T10:22:34.767615",
+    "date_modification": "2026-03-14T10:22:34.767621"
   }
 ]

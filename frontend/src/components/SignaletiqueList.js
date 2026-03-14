@@ -7,6 +7,7 @@ function SignaletiqueList() {
   const { t, language, changeLanguage } = useLanguage();
   const [data, setData] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [instrumentTypes, setInstrumentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -131,6 +132,7 @@ function SignaletiqueList() {
   useEffect(() => {
     fetchData();
     fetchCategories();
+    fetchInstrumentTypes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,6 +148,18 @@ function SignaletiqueList() {
       }
     } catch (err) {
       console.error('Erreur lors du chargement des catégories:', err);
+    }
+  };
+
+  const fetchInstrumentTypes = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/instrument-types/`);
+      if (response.ok) {
+        const data = await response.json();
+        setInstrumentTypes(Array.isArray(data) ? data : (data.results || []));
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des types d\'instruments:', err);
     }
   };
 
@@ -871,6 +885,21 @@ function SignaletiqueList() {
                         >
                           📈
                         </button>
+                        {selectedItem.isin && (
+                          <a
+                            href={`/prix-historique?isin=${selectedItem.isin}`}
+                            title="Gérer l'historique des prix (ajouter, modifier, importer)"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              background: '#8e44ad', color: '#fff', border: 'none',
+                              borderRadius: 4, padding: '4px 10px', fontSize: 12,
+                              fontWeight: 600, textDecoration: 'none', cursor: 'pointer',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            ✏️ Prix
+                          </a>
+                        )}
                       </div>
                     </div>
                     
@@ -1019,8 +1048,8 @@ function SignaletiqueList() {
         )}
 
         {showModal && (
-          <div className="modal-overlay" onClick={() => setShowModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-overlay">
+            <div className="modal-content">
               <div className="modal-header">
                 <h2>{modalMode === 'add' ? '➕ Ajouter un titre' : '✏️ Modifier le titre'}</h2>
                 <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
@@ -1065,10 +1094,17 @@ function SignaletiqueList() {
                       className="form-input"
                     >
                       <option value="">Sélectionner...</option>
-                      <option value="Actions">Actions</option>
-                      <option value="Obligations">Obligations</option>
-                      <option value="ETF">ETF</option>
-                      <option value="Fonds">Fonds</option>
+                      {instrumentTypes.length > 0
+                        ? instrumentTypes.map(it => (
+                            <option key={it.id} value={it.name}>{it.name}</option>
+                          ))
+                        : [
+                            <option key="ETF" value="ETF">ETF</option>,
+                            <option key="Fonds" value="Fonds">Fonds</option>,
+                            <option key="Obligations" value="Obligations">Obligations</option>,
+                            <option key="Actions" value="Actions">Actions</option>,
+                          ]
+                      }
                     </select>
                   </div>
 

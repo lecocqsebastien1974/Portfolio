@@ -7,6 +7,7 @@ from . import admin_views
 # Router pour les ViewSets d'administration
 admin_router = DefaultRouter()
 admin_router.register(r'categories', admin_views.AssetCategoryViewSet, basename='category')
+admin_router.register(r'instrument-types', admin_views.InstrumentTypeViewSet, basename='instrument-type')
 admin_router.register(r'users', admin_views.UserManagementViewSet, basename='user')
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     # Routes existantes
     path('health/', views.health_check, name='health_check'),
     path('categories/', views.list_categories, name='list_categories'),
+    path('instrument-types/', views.list_instrument_types, name='list_instrument_types'),
     path('import/signaletique/', views.import_signaletique, name='import_signaletique'),
     path('signaletique/', views.list_signaletique, name='list_signaletique'),
     path('signaletique/export/', views.export_signaletique_csv, name='export_signaletique_csv'),
@@ -46,7 +48,12 @@ urlpatterns = [
     path('import/bonobo/history/', views.get_bonobo_history, name='get_bonobo_history'),
     path('import/prix-startfiles/', views.import_prix_startfiles, name='import_prix_startfiles'),
     path('prix-historique/consolidate/', views.consolidate_prices, name='consolidate_prices'),
+    path('prix-historique/', views.list_prix_historique, name='list_prix_historique'),
     path('prix-historique/<str:isin>/', views.titre_price_history, name='titre_price_history'),
+    path('prix-historique/<str:isin>/entries/', views.add_prix_entry, name='add_prix_entry'),
+    path('prix-historique/<str:isin>/entries/<str:entry_id>/', views.update_prix_entry, name='update_prix_entry'),
+    path('prix-historique/<str:isin>/delete-entry/<str:entry_id>/', views.delete_prix_entry, name='delete_prix_entry'),
+    path('prix-historique/<str:isin>/import/', views.import_prix_titre, name='import_prix_titre'),
     path('transactions/', views.list_transactions, name='list_transactions'),
     path('transactions/<int:pk>/', views.delete_transaction, name='delete_transaction'),
     path('backup/', views.backup_all_data, name='backup_all_data'),

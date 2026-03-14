@@ -25,6 +25,29 @@ class AssetCategory(models.Model):
         return self.name
 
 
+class InstrumentType(models.Model):
+    """Types d'instruments financiers (ETF, Action, Obligation, etc.)"""
+    name = models.CharField(max_length=200, unique=True, verbose_name="Nom")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
+    color = models.CharField(max_length=7, blank=True, null=True, verbose_name="Couleur (hex)")
+    ordre = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Type d'instrument"
+        verbose_name_plural = "Types d'instruments"
+        ordering = ['ordre', 'name']
+
+    def save(self, *args, **kwargs):
+        if self.name:
+            self.name = self.name.strip().capitalize()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Signaletique(models.Model):
     """Modèle pour stocker les données de signalétique titre"""
     
