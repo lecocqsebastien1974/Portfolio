@@ -815,7 +815,11 @@ def upsert_signaletique(code: str, isin: Optional[str], titre: str,
                         description: Optional[str] = None,
                         categorie_text: Optional[str] = None,
                         statut: Optional[str] = None,
-                        donnees_supplementaires: Optional[Dict] = None) -> Dict:
+                        donnees_supplementaires: Optional[Dict] = None,
+                        prix=None, devise_prix: Optional[str] = None,
+                        source_prix: Optional[str] = None,
+                        date_cours: Optional[str] = None,
+                        frequence_coupon: Optional[str] = None) -> Dict:
     """Crée ou met à jour une signalétique dans le fichier JSON.
     La clé de déduplication est l'ISIN (si présent) puis le code.
     Retourne le dict signaletique (avec son id).
@@ -849,6 +853,13 @@ def upsert_signaletique(code: str, isin: Optional[str], titre: str,
         sig['statut'] = statut
         sig['donnees_supplementaires'] = donnees_supplementaires
         sig['date_modification'] = now
+        if prix is not None:
+            sig['prix'] = prix
+            sig['devise_prix'] = devise_prix
+            sig['source_prix'] = source_prix
+            sig['date_cours'] = date_cours
+        if frequence_coupon is not None:
+            sig['frequence_coupon'] = frequence_coupon
         sigs[existing_idx] = sig
     else:
         sig = {
@@ -860,6 +871,11 @@ def upsert_signaletique(code: str, isin: Optional[str], titre: str,
             'categorie_text': categorie_text,
             'statut': statut,
             'donnees_supplementaires': donnees_supplementaires,
+            'prix': prix,
+            'devise_prix': devise_prix,
+            'source_prix': source_prix,
+            'date_cours': date_cours,
+            'frequence_coupon': frequence_coupon,
             'date_creation': now,
             'date_modification': now,
         }
@@ -874,7 +890,13 @@ def update_signaletique(sig_id: int, data: Dict) -> Optional[Dict]:
     sigs = get_all_signaletiques()
     for i, sig in enumerate(sigs):
         if sig.get('id') == sig_id:
-            sig.update(data)
+            for k, v in data.items():
+                # Pour donnees_supplementaires : fusionner (merge) au lieu de remplacer
+                # afin de préserver les champs non gérés par le formulaire (CodeBank, etc.)
+                if k == 'donnees_supplementaires' and v is not None and sig.get('donnees_supplementaires'):
+                    sig['donnees_supplementaires'] = {**sig['donnees_supplementaires'], **v}
+                else:
+                    sig[k] = v
             sig['date_modification'] = datetime.now().isoformat()
             sigs[i] = sig
             _write_json_file(SIGNALETIQUE_FILE, sigs)

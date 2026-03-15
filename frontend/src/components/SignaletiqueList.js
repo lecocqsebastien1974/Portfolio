@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import '../App.css';
@@ -333,12 +333,15 @@ function SignaletiqueList() {
     }
   };
 
+  const getEffectiveIsin = (item) => item?.isin || item?.donnees_supplementaires?.Isin || item?.donnees_supplementaires?.ISIN || null;
+
   const handleViewTitreHistory = async (item) => {
-    if (showTitreHistory && titreHistory?.isin === item.isin) {
+    const effectiveIsin = getEffectiveIsin(item);
+    if (showTitreHistory && titreHistory?.isin === effectiveIsin) {
       setShowTitreHistory(false);
       return;
     }
-    if (!item.isin) {
+    if (!effectiveIsin) {
       setShowTitreHistory(true);
       setTitreHistory(null);
       setHistoryStatus('not_found');
@@ -348,7 +351,7 @@ function SignaletiqueList() {
     setShowTitreHistory(false);
     setHistoryStatus(null);
     try {
-      const response = await fetch(`${API_URL}/api/prix-historique/${encodeURIComponent(item.isin)}/`);
+      const response = await fetch(`${API_URL}/api/prix-historique/${encodeURIComponent(effectiveIsin)}/`);
       if (response.status === 404) {
         setTitreHistory(null);
         setHistoryStatus('not_found');
@@ -410,6 +413,7 @@ function SignaletiqueList() {
       TER: ds['TER'] || '',
       ESG: ds['ESG'] || '',
       Symbole: ds['Symbole'] || '',
+      CodeBank: ds['CodeBank'] || '',
       'Nom Long': ds['Nom Long'] || '',
       Taux: ds['Taux'] || '',
       Positions: ds['Positions'] || '',
@@ -885,9 +889,9 @@ function SignaletiqueList() {
                         >
                           📈
                         </button>
-                        {selectedItem.isin && (
+                        {getEffectiveIsin(selectedItem) && (
                           <a
-                            href={`/prix-historique?isin=${selectedItem.isin}`}
+                            href={`/prix-historique?isin=${getEffectiveIsin(selectedItem)}`}
                             title="Gérer l'historique des prix (ajouter, modifier, importer)"
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -1025,7 +1029,12 @@ function SignaletiqueList() {
                           </table>
                         ) : historyStatus === 'not_found' ? (
                           <p className="no-history-msg">
-                            Aucun cours importé pour ce titre. Vérifiez que son ISIN figure dans les fichiers Koala ou Bonobo puis cliquez sur « 📥 Importer les prix ».
+                            Aucun cours enregistré pour ce titre.{' '}
+                            {getEffectiveIsin(selectedItem) && (
+                              <Link to={`/prix-historique?isin=${getEffectiveIsin(selectedItem)}`} style={{ color: '#8e44ad', fontWeight: 600 }}>
+                                📈 Ajouter un prix ou importer un historique
+                              </Link>
+                            )}
                           </p>
                         ) : historyStatus === 'error' ? (
                           <p className="no-history-msg">❌ Erreur lors du chargement de l’historique.</p>

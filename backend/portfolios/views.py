@@ -267,27 +267,60 @@ def list_signaletique(request):
             code = f'SIG_{isin}'
         if not titre:
             return Response({'error': 'Le titre est requis'}, status=status.HTTP_400_BAD_REQUEST)
+
+        prix_raw = request.data.get('prix')
+        prix = float(prix_raw) if prix_raw not in (None, '') else None
+        devise_prix = request.data.get('devise_prix') or None
+        source_prix = request.data.get('source_prix') or None
+        date_cours = request.data.get('date_cours') or None
+        frequence_coupon = request.data.get('frequence_coupon') or None
+
+        # Résoudre categorie_text depuis l'ID entier envoyé par le frontend
+        cat_id = request.data.get('categorie')
+        cat = None
+        cat_name = request.data.get('categorie_text') or None
+        if cat_id:
+            try:
+                cat = AssetCategory.objects.get(pk=int(cat_id))
+                cat_name = cat_name or cat.name
+            except (AssetCategory.DoesNotExist, TypeError, ValueError):
+                pass
+        if not cat and cat_name:
+            cat, _ = AssetCategory.objects.get_or_create(name=cat_name)
+
         sig_dict = file_storage.upsert_signaletique(
             code=code, isin=isin, titre=titre,
             description=request.data.get('description'),
-            categorie_text=request.data.get('categorie_text'),
+            categorie_text=cat_name,
             statut=request.data.get('statut'),
-            donnees_supplementaires=request.data.get('donnees_supplementaires')
+            donnees_supplementaires=request.data.get('donnees_supplementaires'),
+            prix=prix, devise_prix=devise_prix,
+            source_prix=source_prix, date_cours=date_cours,
+            frequence_coupon=frequence_coupon,
         )
         # Double-write DB
-        cat = None
-        cat_name = request.data.get('categorie_text')
-        if cat_name:
-            cat, _ = AssetCategory.objects.get_or_create(name=cat_name)
         db_defaults = {'code': code, 'isin': isin, 'titre': titre,
                        'description': request.data.get('description'),
                        'categorie': cat, 'categorie_text': cat_name,
                        'statut': request.data.get('statut'),
-                       'donnees_supplementaires': request.data.get('donnees_supplementaires')}
+                       'donnees_supplementaires': request.data.get('donnees_supplementaires'),
+                       'prix': prix, 'devise_prix': devise_prix,
+                       'source_prix': source_prix, 'date_cours': date_cours,
+                       'frequence_coupon': frequence_coupon}
         if isin:
             Signaletique.objects.update_or_create(isin=isin, defaults=db_defaults)
         else:
             Signaletique.objects.update_or_create(code=code, defaults=db_defaults)
+        # Si un prix + une date sont fournis, créer une entrée dans l'historique
+        if prix is not None and date_cours and isin:
+            entry = {
+                'date': date_cours,
+                'cours': prix,
+                'devise': devise_prix or 'EUR',
+                'source': source_prix or 'manual',
+                'symbole': '',
+            }
+            file_storage.upsert_prix_titre_entry(isin, entry, sig=sig_dict)
         return Response(sig_dict, status=status.HTTP_201_CREATED)
 
 
@@ -1440,17 +1473,65 @@ def signaletique_detail(request, pk):
         return Response(sig_dict)
 
     elif request.method == 'PUT':
-        allowed = ['titre', 'description', 'categorie_text', 'statut', 'donnees_supplementaires']
+        allowed = ['titre', 'description', 'categorie_text', 'statut', 'donnees_supplementaires',
+                   'prix', 'devise_prix', 'source_prix', 'date_cours', 'frequence_coupon']
         update_data = {k: v for k, v in request.data.items() if k in allowed}
+        # Normaliser prix en float si fourni
+        if 'prix' in update_data:
+            prix_raw = update_data['prix']
+            update_data['prix'] = float(prix_raw) if prix_raw not in (None, '') else None
+        # Résoudre categorie_text depuis l'ID entier envoyé par le frontend
+        cat_id = request.data.get('categorie')
+        cat = None
+        cat_name = update_data.get('categorie_text') or None
+        if cat_id:
+            try:
+                cat = AssetCategory.objects.get(pk=int(cat_id))
+                cat_name = cat_name or cat.name
+            except (AssetCategory.DoesNotExist, TypeError, ValueError):
+                pass
+        if not cat and cat_name:
+            cat, _ = AssetCategory.objects.get_or_create(name=cat_name)
+        if cat_name:
+            update_data['categorie_text'] = cat_name
+        # Permettre la mise à jour de l'ISIN (utile si null au niveau racine)
+        isin_raw = request.data.get('isin', '')
+        isin_new = isin_raw.strip().upper() if isin_raw else None
+        if isin_new and len(isin_new) == 12 and not sig_dict.get('isin'):
+            update_data['isin'] = isin_new
+            # Régénérer le code s'il était vide
+            if not sig_dict.get('code'):
+                update_data['code'] = f'SIG_{isin_new}'
         updated = file_storage.update_signaletique(int(pk), update_data)
         # Sync DB
         try:
             db_sig = Signaletique.objects.get(pk=pk)
             for k, v in update_data.items():
                 setattr(db_sig, k, v)
+            if cat:
+                db_sig.categorie = cat
             db_sig.save()
         except Signaletique.DoesNotExist:
             pass
+        # Déterminer l'ISIN effectif (après mise à jour éventuelle)
+        isin = (updated or sig_dict).get('isin')
+        # Fallback : chercher dans donnees_supplementaires si toujours null
+        if not isin:
+            ds = (updated or sig_dict).get('donnees_supplementaires') or {}
+            isin = ds.get('Isin') or ds.get('ISIN') or ds.get('isin') or None
+            if isin:
+                isin = str(isin).strip().upper() or None
+        prix_val = update_data.get('prix')
+        date_cours_val = update_data.get('date_cours')
+        if prix_val is not None and date_cours_val and isin:
+            entry = {
+                'date': date_cours_val,
+                'cours': prix_val,
+                'devise': update_data.get('devise_prix') or 'EUR',
+                'source': update_data.get('source_prix') or 'manual',
+                'symbole': '',
+            }
+            file_storage.upsert_prix_titre_entry(isin, entry, sig=updated or sig_dict)
         return Response(updated)
 
     elif request.method == 'DELETE':

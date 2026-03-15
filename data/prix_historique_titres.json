@@ -34,6 +34,13 @@
         "cours": 71.311,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "FR0010527275_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 71.311,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -248,6 +255,13 @@
         "cours": 7.592,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "LU2314312849_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 7.592,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -267,6 +281,13 @@
       {
         "id": "LU2823898353_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 10.669,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "LU2823898353_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 10.669,
         "devise": "EUR",
         "source": "bonobo"
@@ -292,6 +313,13 @@
         "cours": 63.57,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00B8FHGS14_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 63.57,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -311,6 +339,13 @@
       {
         "id": "IE0008UEVOE0_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 5.675,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "IE0008UEVOE0_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 5.675,
         "devise": "EUR",
         "source": "bonobo"
@@ -336,6 +371,13 @@
         "cours": 6.271,
         "devise": "USD",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00BJ5JPG56_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 6.271,
+        "devise": "USD",
+        "source": "bonobo"
       }
     ]
   },
@@ -355,6 +397,13 @@
       {
         "id": "IE00BDZVH966_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 5.4,
+        "devise": "EUR",
+        "source": "bonobo"
+      },
+      {
+        "id": "IE00BDZVH966_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 5.4,
         "devise": "EUR",
         "source": "bonobo"
@@ -380,6 +429,13 @@
         "cours": 30.285,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "IE00BSJCQV56_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 30.285,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -399,6 +455,13 @@
       {
         "id": "US045167DR18_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 99.005,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US045167DR18_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 99.005,
         "devise": "USD",
         "source": "bonobo"
@@ -426,12 +489,11 @@
         "source": "bonobo"
       },
       {
-        "id": "CA045167FA66_2026-03-14_2_manual",
-        "date": "2026-03-14",
-        "cours": 101.5,
+        "id": "CA045167FA66_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 99.99,
         "devise": "EUR",
-        "source": "manual",
-        "symbole": ""
+        "source": "bonobo"
       }
     ]
   },
@@ -451,6 +513,13 @@
       {
         "id": "US298785HM16_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 98.51,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US298785HM16_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 98.51,
         "devise": "USD",
         "source": "bonobo"
@@ -476,6 +545,13 @@
         "cours": 99.985,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "XS1950499712_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 99.985,
+        "devise": "EUR",
+        "source": "bonobo"
       }
     ]
   },
@@ -495,6 +571,13 @@
       {
         "id": "US91282CAD39_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 95.62,
+        "devise": "USD",
+        "source": "bonobo"
+      },
+      {
+        "id": "US91282CAD39_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 95.62,
         "devise": "USD",
         "source": "bonobo"
@@ -520,6 +603,13 @@
         "cours": 93.485,
         "devise": "NZD",
         "source": "bonobo"
+      },
+      {
+        "id": "NZGOVDT528C6_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 93.485,
+        "devise": "NZD",
+        "source": "bonobo"
       }
     ]
   },
@@ -539,6 +629,13 @@
       {
         "id": "NZGOVDT526C0_2026-03-14_1_bonobo",
         "date": "2026-03-14",
+        "cours": 99.488,
+        "devise": "NZD",
+        "source": "bonobo"
+      },
+      {
+        "id": "NZGOVDT526C0_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
         "cours": 99.488,
         "devise": "NZD",
         "source": "bonobo"
@@ -564,6 +661,125 @@
         "cours": 46.19,
         "devise": "EUR",
         "source": "bonobo"
+      },
+      {
+        "id": "LU0099624925_2026-03-15_2_bonobo",
+        "date": "2026-03-15",
+        "cours": 46.19,
+        "devise": "EUR",
+        "source": "bonobo"
+      }
+    ]
+  },
+  "BE1234567890": {
+    "isin": "BE1234567890",
+    "nom": "Immeuble 1",
+    "signaletique_id": 34,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "BE1234567890_2026-01-06T00:00:00_1_Manuel",
+        "date": "2026-01-06T00:00:00",
+        "cours": 101.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 1"
+      },
+      {
+        "id": "BE1234567890_2026-01-07T00:00:00_3_Manuel",
+        "date": "2026-01-07T00:00:00",
+        "cours": 102.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 2"
+      },
+      {
+        "id": "BE1234567890_2026-01-08T00:00:00_5_Manuel",
+        "date": "2026-01-08T00:00:00",
+        "cours": 103.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 3"
+      },
+      {
+        "id": "BE1234567890_2026-01-09T00:00:00_7_Manuel",
+        "date": "2026-01-09T00:00:00",
+        "cours": 104.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 4"
+      },
+      {
+        "id": "BE1234567890_2026-01-10T00:00:00_9_Manuel",
+        "date": "2026-01-10T00:00:00",
+        "cours": 105.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 5"
+      },
+      {
+        "id": "BE1234567890_2026-01-11T00:00:00_11_Manuel",
+        "date": "2026-01-11T00:00:00",
+        "cours": 106.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 6"
+      },
+      {
+        "id": "BE1234567890_2026-01-12T00:00:00_13_Manuel",
+        "date": "2026-01-12T00:00:00",
+        "cours": 107.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 7"
+      },
+      {
+        "id": "BE1234567890_2026-01-13T00:00:00_15_Manuel",
+        "date": "2026-01-13T00:00:00",
+        "cours": 108.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 8"
+      },
+      {
+        "id": "BE1234567890_2026-01-14T00:00:00_17_Manuel",
+        "date": "2026-01-14T00:00:00",
+        "cours": 109.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 9"
+      },
+      {
+        "id": "BE1234567890_2026-01-15T00:00:00_19_Manuel",
+        "date": "2026-01-15T00:00:00",
+        "cours": 110.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": "Immeuble 10"
+      },
+      {
+        "id": "BE1234567890_2026-03-15_0_manual",
+        "date": "2026-03-15",
+        "cours": 100.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": ""
+      }
+    ]
+  },
+  "IE00BYZTVV78": {
+    "isin": "IE00BYZTVV78",
+    "nom": "iShares € Corp Bond 0-3Yr ESG SRI UCITS ETF Dis",
+    "signaletique_id": 1,
+    "devise_ref": "EUR",
+    "historique": [
+      {
+        "id": "IE00BYZTVV78_2026-03-15_0_manual",
+        "date": "2026-03-15",
+        "cours": 100.0,
+        "devise": "EUR",
+        "source": "Manuel",
+        "symbole": ""
       }
     ]
   }
